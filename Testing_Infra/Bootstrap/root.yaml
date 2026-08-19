@@ -9,6 +9,12 @@ spec:
         elements:
           - app: vault
             path: Apps/Vault
+          - app: cilium
+            path: Apps/Cilium
+          - app: Eso
+            path: Apps/External-Secrets
+          - app: cert-manager
+            path: Apps/Cert-Manager
 
   template:
     metadata:
