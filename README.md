@@ -1,5 +1,3 @@
-# 👁️ Theoros 
-
 > **Theoros** *(Greek: Θεωρός)* - An observer, an envoy, or one who travels to consult an oracle. 
 > 
 > *Status: 🚧 Currently Under Construction 🚧*
