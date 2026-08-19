@@ -19,6 +19,9 @@ spec:
         k8sServicePort: 6443
         hostFirewall:
           enabled: true
+
+        operator:
+          replicas: 1
         
         l7Proxy: false
         envoy:
