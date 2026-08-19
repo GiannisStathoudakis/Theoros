@@ -1,0 +1,73 @@
+---
+- hosts: master
+  vars_files:
+    - files/secrets.yml
+
+  tasks:
+    - name: 00. Install required Python libraries on Master host
+      become: true
+      ansible.builtin.apt:
+        name: 
+          - python3-kubernetes
+          - python3-yaml
+        state: present
+        update_cache: yes
+    
+    - name: 01. Install gateway-api
+      kubernetes.core.k8s:
+        state: present
+        src: https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.0/experimental-install.yaml
+
+    - name: 02. Add Cilium Helm repo
+      kubernetes.core.helm_repository:
+        name: cilium
+        repo_url: https://helm.cilium.io/
+
+    - name: 03. Install Cilium CNI via Helm
+      kubernetes.core.helm:
+        name: cilium
+        chart_ref: cilium/cilium
+        release_namespace: kube-system
+        state: present
+        wait: true
+        timeout: 10m0s 
+        values:
+          kubeProxyReplacement: "true"
+          k8sServiceHost: "{{ master_ip }}"
+          k8sServicePort: 6443
+          operator:
+            replicas: 1
+    
+    - name: 04. Create Argo CD namespace
+      kubernetes.core.k8s:
+        name: argocd
+        api_version: v1
+        kind: Namespace
+        state: present
+
+    - name: 05. Add Argo Helm repository
+      kubernetes.core.helm_repository:
+        name: argo
+        repo_url: https://argoproj.github.io/argo-helm
+
+    - name: 06. Install Argo CD via Helm
+      kubernetes.core.helm:
+        name: argocd
+        chart_ref: argo/argo-cd
+        release_namespace: argocd
+        state: present
+        wait: true
+
+    - name: 07. Retrieve Argo CD initial admin password
+      kubernetes.core.k8s_info:
+        kind: Secret
+        name: argocd-initial-admin-secret
+        namespace: argocd
+      register: argocd_secret
+
+    - name: 08. Print Argo CD password
+      ansible.builtin.debug:
+        msg: "Argo CD Password: {{ argocd_secret.resources[0].data.password | b64decode }}"
+    
+    - name: 09. Port-forward ArgoCd
+      ansible.builtin.shell: kubectl port-forward svc/argocd-server -n argocd 8080:443 --address 0.0.0.0
