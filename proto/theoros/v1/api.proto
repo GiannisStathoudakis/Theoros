@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package theoros.v1;
+
+option go_package = "github.com/GiannisStathoudakis/Theoros/gen/theoros/v1";
+
+service KubernetesService {
+  rpc ExecuteCommand(CommandRequest) returns (CommandResponse);
+  rpc InteractiveExec(stream ExecRequest) returns (stream ExecResponse);
+}
+
+message CommandRequest {
+  string action = 1;
+  string resource = 2;
+  string name = 3;
+  string namespace = 4;
+  repeated string flags = 5;
+}
+
+message CommandResponse {
+  string output = 1;
+}
+
+message ExecRequest {
+  string pod_name = 1;
+  string namespace = 2;
+  bytes stdin_data = 3; 
+}
+
+message ExecResponse {
+  bytes stdout_data = 1;
+  bytes stderr_data = 2;
+}
