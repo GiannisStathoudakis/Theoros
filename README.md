@@ -1,70 +1,44 @@
-# Theoros (Θεωρός)
+# 👁️ Theoros 
 
-> **🚧 UNDER ACTIVE CONSTRUCTION 🚧**  
-> *This project is actively being developed as a hands-on journey to master Go, cloud-native architectures, gRPC streaming, and Kubernetes systems programming.*
+> **Theoros** *(Greek: Θεωρός)* - An observer, an envoy, or one who travels to consult an oracle. 
+> 
+> *Status: 🚧 Currently Under Construction 🚧*
 
----
+## Overview
+**Theoros** is a zero-trust, interactive terminal client and remote-execution agent for Kubernetes. 
 
-## 🏛️ What Does *Theoros* Mean?
-
-In ancient Greece, a **Theoros** (Greek: *Θεωρός*) was an official state envoy or sacred observer sent to witness events, inspect sanctuaries, or consult the oracle. It is the ancient root of the modern word **theory** (*viewing, contemplation, observation*).
-
-This project acts as your personal digital *Theoros*: an observer sent deep into your Kubernetes cluster to inspect health, stream telemetry, and report back the truth of what is happening inside.
+Built entirely in Go, it replaces the need for distributing highly-privileged `kubeconfig` files to developer laptops. Instead, users authenticate via a secure client to a lightweight Go agent running inside the cluster. The agent executes commands on their behalf via the official Kubernetes `client-go` library, proxying the results back through any standard Ingress controller or Gateway API.
 
 ---
 
-## Project Purpose
+## System Architecture & Security
 
-`theoros` is a personal DevOps project built from scratch to learn and master:
-* Building high-performance, concurrent Go microservices and CLI tools.
-* Binary multiplexed streaming using **gRPC** and **Protocol Buffers**.
-* Modern cloud-native ingress routing via the **Kubernetes Gateway API (`GRPCRoute`)**.
-* Direct integration with internal cluster APIs (**Loki LogQL**, **VictoriaMetrics PromQL**, and **Kubernetes `client-go`**).
-* **Dyslexia-friendly terminal UX** with high-contrast styling and structured formatting to eliminate monochromatic text fatigue.
+Theoros is designed with a strict "SecOps" mindset. The architecture is split into two components: the local Client and the in-cluster Server.
 
----
+### 1. The Client (Interactive Terminal)
+* **No Kubeconfigs:** The client knows nothing about Kubernetes certificates. It acts purely as a dumb terminal sending RPC requests.
+* **AES-256 Encrypted Vault:** User credentials and tokens are stored in an encrypted local file (`~/.theoros/vault.enc`), unlocked by a single master password upon terminal startup.
+* **Interactive REPL:** Built using `c-bata/go-prompt` to provide a Zsh-style interactive dropdown, context-aware autocomplete, and syntax highlighting.
 
-## Roadmap & Architecture
+### 2. The Network (Reverse Proxy & Connect-RPC)
+* **Ingress / Gateway API:** All traffic routes through a standard reverse proxy (e.g., Nginx, Traefik, HAProxy, or Envoy), which handles SSL/TLS termination using standard web certificates.
+* **Legacy-Compatible RPC:** Unlike standard gRPC—which strictly requires HTTP/2 multiplexing and specialized load balancers—communication uses the [Connect RPC](https://connectrpc.com/) framework. Because Connect gracefully supports standard HTTP/1.1 alongside HTTP/2, Theoros works out-of-the-box with older or traditional infrastructure without requiring complex end-to-end HTTP/2 tunneling setups.
+* **Dual-Tier Authentication:** 
+  * Users are issued a long-lived API Token (acting as their identity).
+  * The client exchanges this token for a **short-lived JWT** for actual command execution.
+  * The REPL silently handles background JWT rotation so the user experience is never interrupted.
 
-```text
-[ Local CLI (REPL) ] 
-       │
-       ▼ (gRPC Stream over TLS 1.3 / Gateway API)
-[ In-Cluster Theoros Server Pod ]
-       ├── Loki (Real-time LogQL Stream)
-       ├── Kubernetes API (Namespaces, Pods, Events, PVCs)
-       └── VictoriaMetrics (PromQL Metrics)
-```
-
----
-
-### Phase 1: Real-Time Log Observability (Current Focus)
-
-* **Interactive REPL Shell:** Starts a dedicated terminal session (`theoros>`) that maintains a persistent gRPC connection.
-* **Token Authentication & Local Vault:** Zero certificate file hassle. Authenticates via a high-entropy token stored locally in an encrypted vault (`~/.ssh/theoros/credentials.enc`) protected by your passphrase.
-* **Live Loki Streaming:** Stream logs over gRPC with custom LogQL filters (e.g., `--level ERROR,WARN --since 1h`).
-* **Dyslexia-Friendly Visuals:** High-contrast badges (`[ERROR]`, `[WARN]`), muted timestamps, and auto-indented, syntax-colored JSON via [Charm Lip Gloss](https://github.com/charmbracelet/lipgloss).
-* **Instant Dynamic Tab-Completion:** In-memory caching of active namespaces and pods for smooth TAB suggestions in the prompt.
+### 3. The Server (In-Cluster Agent)
+* **Helm & RBAC:** The server is deployed via a Helm chart, which provisions the necessary `ServiceAccount`, `Roles`, and `RoleBindings`.
+* **In-Cluster Execution:** The Go server uses `rest.InClusterConfig()` to communicate directly with the Kubernetes Control Plane, meaning the server itself requires no hardcoded passwords.
+* **Encrypted Token Storage:** The server securely stores the API tokens in an encrypted format. For maximum security, the master encryption key is passed via a Kubernetes Secret at deployment time, completely avoiding plaintext environment variables.
+* **Server Management CLI:** User identities and their associated tokens are managed via a dedicated server-side CLI. Administrators can easily execute commands within the pod to provision access for new users or instantly revoke tokens.
 
 ---
 
-### Future Phases & Planned Features
+## 🚀 Future Capabilities
 
-* [ ] **Module A: Smart PVC & Volume Diagnostics**  
-  Add `diagnose volume <pvc>` to automatically inspect StorageClasses, PV bindings, and Kubernetes `Events` to explain *why* a volume mount failed in plain English.
-* [ ] **Module B: VictoriaMetrics Integration**  
-  Stream historical CPU/Memory saturation trends and spike alerts directly into the terminal without opening heavy web dashboards.
-* [ ] **Module C: In-Cluster Watcher & Discord Alerts**  
-  A background daemon using `client-go` Informers to watch cluster events. Features an in-memory **5-minute debounce timer** before dispatching rich embed alerts to Discord (preventing temporary restart spam).
-* [ ] **Module D: Full-Screen Interactive TUI**  
-  Evolve the REPL into an interactive full-screen dashboard (built with [Bubble Tea](https://github.com/charmbracelet/bubbletea)) to manage pods, stream logs, and view metrics like a personalized `k9s`.
+While the core focus is currently Kubernetes remote execution, Theoros is designed to become a unified observability terminal:
 
----
-
-## Tech Stack
-
-* **Language:** Go (Golang)
-* **Communication:** gRPC / Protocol Buffers v3
-* **Routing & Security:** Kubernetes Gateway API (`GRPCRoute`), AES-256-GCM / Argon2id
-* **Observability:** Grafana Loki, VictoriaMetrics, Kubernetes `client-go`
-* **Terminal UX:** `c-bata/go-prompt`, `charmbracelet/lipgloss`, `tidwall/pretty`
+* **Logs Integration (`l` mode):** API integration with Grafana Loki (and eventually VictoriaLogs) to stream logs natively in the terminal, featuring color-coded filtering for warnings (`-w`) and errors (`-e`).
+* **Metrics Integration (`m` mode):** Support for Prometheus, Mimir and VictoriaMetrics data sources, allowing users to query cluster health and resource usage with built-in formatting (e.g., passing `-h` to auto-convert bytes into human-readable formats) without leaving the command line.
