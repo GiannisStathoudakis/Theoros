@@ -1,0 +1,4 @@
+inventory
+ansible.cfg
+secrets.yml
+cluster-keys.json
