@@ -17,6 +17,8 @@ spec:
             path: Apps/Cert-Manager
           - app: envoy
             path: Apps/Envoy
+          - app: argocd
+            path: Apps/ArgoCD
 
   template:
     metadata:
