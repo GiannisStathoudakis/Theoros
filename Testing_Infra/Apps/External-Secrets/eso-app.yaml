@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: external-secrets
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  source:
+    repoURL: ghcr.io/external-secrets/charts
+    chart: external-secrets
+    targetRevision: 2.9.0
+    helm:
+      parameters:
+        - name: installCRDs
+          value: "true"
+        - name: webhook.port
+          value: "9443"
+        - name: webhook.metrics.listen.port
+          value: "8080"
+        - name: webhook.readinessProbe.port
+          value: "8081" 
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: external-secrets
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
