@@ -22,6 +22,8 @@ spec:
 
         operator:
           replicas: 1
+          updateStrategy:
+            type: Recreate
         
         l7Proxy: false
         envoy:
