@@ -1,0 +1,27 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: cluster-addons
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - app: vault
+            path: Apps/Vault
+
+  template:
+    metadata:
+      name: '{{app}}-root'
+    spec:
+      project: default
+      source:
+        repoURL: git@github.com:GiannisStathoudakis/Theoros.git
+        targetRevision: HEAD
+        path: 'Testing_Infra/{{path}}'
+      destination:
+        server: https://kubernetes.default.svc
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
