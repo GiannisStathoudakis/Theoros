@@ -11,7 +11,7 @@ spec:
             path: Apps/Vault
           - app: cilium
             path: Apps/Cilium
-          - app: Eso
+          - app: eso
             path: Apps/External-Secrets
           - app: cert-manager
             path: Apps/Cert-Manager
