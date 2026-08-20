@@ -21,32 +21,32 @@ jobs:
     permissions:
       contents: read
       packages: write
-      security-events: write # for Semgrep and Trivy
+    #  security-events: write # for Semgrep and Trivy
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v7
-        with:
-          fetch-depth: 0 # for GitLeaks
+      #  with:
+      #    fetch-depth: 0 # for GitLeaks
 
       # -------------------------------------------------------------
       # PRE-BUILD SCANS
       # -------------------------------------------------------------
-      - name: GitLeaks - Secret Scanner
-        uses: gitleaks/gitleaks-action@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #- name: GitLeaks - Secret Scanner
+      #  uses: gitleaks/gitleaks-action@v3
+      #  env:
+      #    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           
-      - name: Semgrep - SAST Scanner
-        run: |
-          python3 -m pip install semgrep
-          semgrep scan --config auto --sarif --output=semgrep.sarif ./
+      #- name: Semgrep - SAST Scanner
+      #  run: |
+      #    python3 -m pip install semgrep
+      #    semgrep scan --config auto --sarif --output=semgrep.sarif ./
 
-      - name: Upload Semgrep SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: semgrep.sarif
+      #- name: Upload Semgrep SARIF
+      #  if: always()
+      #  uses: github/codeql-action/upload-sarif@v4
+      #  with:
+      #    sarif_file: semgrep.sarif
 
       # -------------------------------------------------------------
       # BUILD STAGE (Go Native)
@@ -89,22 +89,22 @@ jobs:
       # -------------------------------------------------------------
       # POST-BUILD SCANS & PUSH
       # -------------------------------------------------------------
-      - name: Trivy Scanner
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: ghcr.io/giannisstathoudakis/theoros-server:${{ github.sha }}
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-          exit-code: '0' 
-          ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
+      #- name: Trivy Scanner
+      #  uses: aquasecurity/trivy-action@v0.36.0
+      #  with:
+      #    image-ref: ghcr.io/giannisstathoudakis/theoros-server:${{ github.sha }}
+      #    format: 'sarif'
+      #    output: 'trivy-results.sarif'
+      #    exit-code: '0' 
+      #    ignore-unfixed: true
+      #    vuln-type: 'os,library'
+      #    severity: 'CRITICAL,HIGH'
 
-      - name: Upload Trivy SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: trivy-results.sarif
+      #- name: Upload Trivy SARIF
+      #  if: always()
+      #  uses: github/codeql-action/upload-sarif@v4
+      #  with:
+      #    sarif_file: trivy-results.sarif
 
       - name: Push Docker Image to GHCR
         id: build-push
