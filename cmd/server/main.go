@@ -35,7 +35,7 @@ func (s *TheorosServer) Login(
 
 	claims := jwt.MapClaims{
 		"authorized": true,
-		"exp":        time.Now().Add(time.Hour * 24).Unix(),
+		"exp":        time.Now().Add(time.Hour * 11).Unix(),
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -78,7 +78,7 @@ func (s *TheorosServer) ExecuteCommand(
 	var errBuf bytes.Buffer
 
 	ioStreams := genericclioptions.IOStreams{
-		In:     bytes.NewReader(nil), // empty stdin
+		In:     bytes.NewReader(nil),
 		Out:    &outBuf,
 		ErrOut: &errBuf,
 	}
@@ -92,15 +92,27 @@ func (s *TheorosServer) ExecuteCommand(
 	kubectlCmd := cmd.NewKubectlCommand(kubectlOptions)
 	kubectlCmd.SetArgs(args)
 
+	kubectlCmd.SilenceUsage = true
+	kubectlCmd.SilenceErrors = true
+
 	err := kubectlCmd.Execute()
+
+	finalOutput := outBuf.String()
+	if errBuf.Len() > 0 {
+		if finalOutput != "" {
+			finalOutput += "\n"
+		}
+		finalOutput += errBuf.String()
+	}
+
 	if err != nil {
 		return nil, connect.NewError(
 			connect.CodeInvalidArgument,
-			fmt.Errorf("command failed: %s", errBuf.String()),
+			fmt.Errorf("%s\n%s", err.Error(), errBuf.String()),
 		)
 	}
 
-	return connect.NewResponse(&pb.CommandResponse{Output: outBuf.String()}), nil
+	return connect.NewResponse(&pb.CommandResponse{Output: finalOutput}), nil
 }
 
 func (s *TheorosServer) InteractiveExec(
