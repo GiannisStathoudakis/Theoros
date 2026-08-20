@@ -19,6 +19,8 @@ import (
 	"github.com/GiannisStathoudakis/Theoros/gen/theoros/v1/v1connect"
 
 	// kubectl source code
+
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubectl/pkg/cmd"
 )
 
@@ -55,11 +57,7 @@ func (s *TheorosServer) ExecuteCommand(
 ) (*connect.Response[pb.CommandResponse], error) {
 
 	log.Printf("[Audit] Executing: %s %s (namespace: '%s', flags: %v)",
-		req.Msg.Action,
-		req.Msg.Resource,
-		req.Msg.Namespace,
-		req.Msg.Flags,
-	)
+		req.Msg.Action, req.Msg.Resource, req.Msg.Namespace, req.Msg.Flags)
 
 	args := []string{req.Msg.Action}
 
@@ -79,10 +77,20 @@ func (s *TheorosServer) ExecuteCommand(
 	var outBuf bytes.Buffer
 	var errBuf bytes.Buffer
 
-	kubectlCmd := cmd.NewDefaultKubectlCommand()
+	ioStreams := genericclioptions.IOStreams{
+		In:     bytes.NewReader(nil), // empty stdin
+		Out:    &outBuf,
+		ErrOut: &errBuf,
+	}
+
+	kubectlOptions := cmd.KubectlOptions{
+		Arguments:   args,
+		ConfigFlags: genericclioptions.NewConfigFlags(true),
+		IOStreams:   ioStreams,
+	}
+
+	kubectlCmd := cmd.NewKubectlCommand(kubectlOptions)
 	kubectlCmd.SetArgs(args)
-	kubectlCmd.SetOut(&outBuf)
-	kubectlCmd.SetErr(&errBuf)
 
 	err := kubectlCmd.Execute()
 	if err != nil {
