@@ -6,7 +6,7 @@ metadata:
 spec:
   refreshInterval: "1h"
   secretStoreRef:
-    name: theoros-jwt
+    name: vault-backend
     kind: ClusterSecretStore
   target:
     name: theoros-jwt
