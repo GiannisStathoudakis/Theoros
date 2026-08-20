@@ -19,10 +19,6 @@ spec:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           
-          env:
-            - name: PORT
-              value: {{ .Values.service.targetPort | quote }}
-
           volumeMounts:
             - name: jwt-secret-volume
               mountPath: "/etc/theoros/secrets"
@@ -36,4 +32,4 @@ spec:
       volumes:
         - name: jwt-secret-volume
           secret:
-            secretName: theoros-jwt-secret
+            secretName: theoros-jwt
