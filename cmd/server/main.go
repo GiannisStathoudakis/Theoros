@@ -22,18 +22,15 @@ import (
 	"k8s.io/kubectl/pkg/cmd"
 )
 
-// Pass the secret key into the struct so we can sign new tokens
 type TheorosServer struct {
 	secretKey []byte
 }
 
-// --- NEW LOGIN GENERATOR ---
 func (s *TheorosServer) Login(
 	ctx context.Context,
 	req *connect.Request[pb.LoginRequest],
 ) (*connect.Response[pb.LoginResponse], error) {
 
-	// Create a simple JWT that expires in 24 hours
 	claims := jwt.MapClaims{
 		"authorized": true,
 		"exp":        time.Now().Add(time.Hour * 24).Unix(),
@@ -110,7 +107,6 @@ func NewAuthInterceptor(secretKey []byte) connect.UnaryInterceptorFunc {
 	return func(next connect.UnaryFunc) connect.UnaryFunc {
 		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 
-			// The Interceptor skips the auth check for the "Login" endpoint!
 			if strings.HasSuffix(req.Spec().Procedure, "Login") {
 				return next(ctx, req)
 			}
