@@ -57,3 +57,23 @@ spec:
   - backendRefs:
     - name: argocd-server
       port: 80
+--- 
+# -----------------------------
+# Theoros Routing
+# -----------------------------
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: theoros-route
+  namespace: theoros
+spec:
+  parentRefs:
+  - name: lab-gateway
+    namespace: envoy-gateway-system
+    sectionName: https
+  hostnames: 
+  - "theoros.kublab.org"
+  rules:
+  - backendRefs:
+    - name: theoros-svc 
+      port: 8080
