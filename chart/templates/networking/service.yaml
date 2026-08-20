@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "theoros.fullname" . }}-svc
+  labels:
+    {{- include "theoros.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}
+      protocol: TCP
+      name: grpc
+  selector:
+    {{- include "theoros.selectorLabels" . | nindent 4 }}
