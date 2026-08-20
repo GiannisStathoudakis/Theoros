@@ -90,7 +90,7 @@ jobs:
       # POST-BUILD SCANS & PUSH
       # -------------------------------------------------------------
       - name: Trivy Scanner
-        uses: aquasecurity/trivy-action@v3
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ghcr.io/giannisstathoudakis/theoros-server:${{ github.sha }}
           format: 'sarif'
