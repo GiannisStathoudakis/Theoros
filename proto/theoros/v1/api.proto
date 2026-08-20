@@ -5,8 +5,16 @@ package theoros.v1;
 option go_package = "github.com/GiannisStathoudakis/Theoros/gen/theoros/v1";
 
 service KubernetesService {
+  rpc Login(LoginRequest) returns (LoginResponse);
   rpc ExecuteCommand(CommandRequest) returns (CommandResponse);
   rpc InteractiveExec(stream ExecRequest) returns (stream ExecResponse);
+}
+
+message LoginRequest {
+}
+
+message LoginResponse {
+  string token = 1;
 }
 
 message CommandRequest {

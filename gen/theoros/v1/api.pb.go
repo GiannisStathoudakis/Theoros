@@ -21,6 +21,86 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type LoginRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LoginRequest) Reset() {
+	*x = LoginRequest{}
+	mi := &file_proto_theoros_v1_api_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LoginRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LoginRequest) ProtoMessage() {}
+
+func (x *LoginRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_theoros_v1_api_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LoginRequest.ProtoReflect.Descriptor instead.
+func (*LoginRequest) Descriptor() ([]byte, []int) {
+	return file_proto_theoros_v1_api_proto_rawDescGZIP(), []int{0}
+}
+
+type LoginResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LoginResponse) Reset() {
+	*x = LoginResponse{}
+	mi := &file_proto_theoros_v1_api_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LoginResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LoginResponse) ProtoMessage() {}
+
+func (x *LoginResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_theoros_v1_api_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LoginResponse.ProtoReflect.Descriptor instead.
+func (*LoginResponse) Descriptor() ([]byte, []int) {
+	return file_proto_theoros_v1_api_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *LoginResponse) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
 type CommandRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Action        string                 `protobuf:"bytes,1,opt,name=action,proto3" json:"action,omitempty"`
@@ -34,7 +114,7 @@ type CommandRequest struct {
 
 func (x *CommandRequest) Reset() {
 	*x = CommandRequest{}
-	mi := &file_proto_theoros_v1_api_proto_msgTypes[0]
+	mi := &file_proto_theoros_v1_api_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -46,7 +126,7 @@ func (x *CommandRequest) String() string {
 func (*CommandRequest) ProtoMessage() {}
 
 func (x *CommandRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_theoros_v1_api_proto_msgTypes[0]
+	mi := &file_proto_theoros_v1_api_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -59,7 +139,7 @@ func (x *CommandRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandRequest.ProtoReflect.Descriptor instead.
 func (*CommandRequest) Descriptor() ([]byte, []int) {
-	return file_proto_theoros_v1_api_proto_rawDescGZIP(), []int{0}
+	return file_proto_theoros_v1_api_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *CommandRequest) GetAction() string {
@@ -106,7 +186,7 @@ type CommandResponse struct {
 
 func (x *CommandResponse) Reset() {
 	*x = CommandResponse{}
-	mi := &file_proto_theoros_v1_api_proto_msgTypes[1]
+	mi := &file_proto_theoros_v1_api_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -118,7 +198,7 @@ func (x *CommandResponse) String() string {
 func (*CommandResponse) ProtoMessage() {}
 
 func (x *CommandResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_theoros_v1_api_proto_msgTypes[1]
+	mi := &file_proto_theoros_v1_api_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -131,7 +211,7 @@ func (x *CommandResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommandResponse.ProtoReflect.Descriptor instead.
 func (*CommandResponse) Descriptor() ([]byte, []int) {
-	return file_proto_theoros_v1_api_proto_rawDescGZIP(), []int{1}
+	return file_proto_theoros_v1_api_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CommandResponse) GetOutput() string {
@@ -152,7 +232,7 @@ type ExecRequest struct {
 
 func (x *ExecRequest) Reset() {
 	*x = ExecRequest{}
-	mi := &file_proto_theoros_v1_api_proto_msgTypes[2]
+	mi := &file_proto_theoros_v1_api_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -164,7 +244,7 @@ func (x *ExecRequest) String() string {
 func (*ExecRequest) ProtoMessage() {}
 
 func (x *ExecRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_theoros_v1_api_proto_msgTypes[2]
+	mi := &file_proto_theoros_v1_api_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -177,7 +257,7 @@ func (x *ExecRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecRequest.ProtoReflect.Descriptor instead.
 func (*ExecRequest) Descriptor() ([]byte, []int) {
-	return file_proto_theoros_v1_api_proto_rawDescGZIP(), []int{2}
+	return file_proto_theoros_v1_api_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ExecRequest) GetPodName() string {
@@ -211,7 +291,7 @@ type ExecResponse struct {
 
 func (x *ExecResponse) Reset() {
 	*x = ExecResponse{}
-	mi := &file_proto_theoros_v1_api_proto_msgTypes[3]
+	mi := &file_proto_theoros_v1_api_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -223,7 +303,7 @@ func (x *ExecResponse) String() string {
 func (*ExecResponse) ProtoMessage() {}
 
 func (x *ExecResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_theoros_v1_api_proto_msgTypes[3]
+	mi := &file_proto_theoros_v1_api_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -236,7 +316,7 @@ func (x *ExecResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ExecResponse.ProtoReflect.Descriptor instead.
 func (*ExecResponse) Descriptor() ([]byte, []int) {
-	return file_proto_theoros_v1_api_proto_rawDescGZIP(), []int{3}
+	return file_proto_theoros_v1_api_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *ExecResponse) GetStdoutData() []byte {
@@ -258,7 +338,10 @@ var File_proto_theoros_v1_api_proto protoreflect.FileDescriptor
 const file_proto_theoros_v1_api_proto_rawDesc = "" +
 	"\n" +
 	"\x1aproto/theoros/v1/api.proto\x12\n" +
-	"theoros.v1\"\x8c\x01\n" +
+	"theoros.v1\"\x0e\n" +
+	"\fLoginRequest\"%\n" +
+	"\rLoginResponse\x12\x14\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\"\x8c\x01\n" +
 	"\x0eCommandRequest\x12\x16\n" +
 	"\x06action\x18\x01 \x01(\tR\x06action\x12\x1a\n" +
 	"\bresource\x18\x02 \x01(\tR\bresource\x12\x12\n" +
@@ -276,8 +359,9 @@ const file_proto_theoros_v1_api_proto_rawDesc = "" +
 	"\vstdout_data\x18\x01 \x01(\fR\n" +
 	"stdoutData\x12\x1f\n" +
 	"\vstderr_data\x18\x02 \x01(\fR\n" +
-	"stderrData2\xa8\x01\n" +
-	"\x11KubernetesService\x12I\n" +
+	"stderrData2\xe6\x01\n" +
+	"\x11KubernetesService\x12<\n" +
+	"\x05Login\x12\x18.theoros.v1.LoginRequest\x1a\x19.theoros.v1.LoginResponse\x12I\n" +
 	"\x0eExecuteCommand\x12\x1a.theoros.v1.CommandRequest\x1a\x1b.theoros.v1.CommandResponse\x12H\n" +
 	"\x0fInteractiveExec\x12\x17.theoros.v1.ExecRequest\x1a\x18.theoros.v1.ExecResponse(\x010\x01B7Z5github.com/GiannisStathoudakis/Theoros/gen/theoros/v1b\x06proto3"
 
@@ -293,20 +377,24 @@ func file_proto_theoros_v1_api_proto_rawDescGZIP() []byte {
 	return file_proto_theoros_v1_api_proto_rawDescData
 }
 
-var file_proto_theoros_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_proto_theoros_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_proto_theoros_v1_api_proto_goTypes = []any{
-	(*CommandRequest)(nil),  // 0: theoros.v1.CommandRequest
-	(*CommandResponse)(nil), // 1: theoros.v1.CommandResponse
-	(*ExecRequest)(nil),     // 2: theoros.v1.ExecRequest
-	(*ExecResponse)(nil),    // 3: theoros.v1.ExecResponse
+	(*LoginRequest)(nil),    // 0: theoros.v1.LoginRequest
+	(*LoginResponse)(nil),   // 1: theoros.v1.LoginResponse
+	(*CommandRequest)(nil),  // 2: theoros.v1.CommandRequest
+	(*CommandResponse)(nil), // 3: theoros.v1.CommandResponse
+	(*ExecRequest)(nil),     // 4: theoros.v1.ExecRequest
+	(*ExecResponse)(nil),    // 5: theoros.v1.ExecResponse
 }
 var file_proto_theoros_v1_api_proto_depIdxs = []int32{
-	0, // 0: theoros.v1.KubernetesService.ExecuteCommand:input_type -> theoros.v1.CommandRequest
-	2, // 1: theoros.v1.KubernetesService.InteractiveExec:input_type -> theoros.v1.ExecRequest
-	1, // 2: theoros.v1.KubernetesService.ExecuteCommand:output_type -> theoros.v1.CommandResponse
-	3, // 3: theoros.v1.KubernetesService.InteractiveExec:output_type -> theoros.v1.ExecResponse
-	2, // [2:4] is the sub-list for method output_type
-	0, // [0:2] is the sub-list for method input_type
+	0, // 0: theoros.v1.KubernetesService.Login:input_type -> theoros.v1.LoginRequest
+	2, // 1: theoros.v1.KubernetesService.ExecuteCommand:input_type -> theoros.v1.CommandRequest
+	4, // 2: theoros.v1.KubernetesService.InteractiveExec:input_type -> theoros.v1.ExecRequest
+	1, // 3: theoros.v1.KubernetesService.Login:output_type -> theoros.v1.LoginResponse
+	3, // 4: theoros.v1.KubernetesService.ExecuteCommand:output_type -> theoros.v1.CommandResponse
+	5, // 5: theoros.v1.KubernetesService.InteractiveExec:output_type -> theoros.v1.ExecResponse
+	3, // [3:6] is the sub-list for method output_type
+	0, // [0:3] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -323,7 +411,7 @@ func file_proto_theoros_v1_api_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_theoros_v1_api_proto_rawDesc), len(file_proto_theoros_v1_api_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -33,6 +33,8 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
+	// KubernetesServiceLoginProcedure is the fully-qualified name of the KubernetesService's Login RPC.
+	KubernetesServiceLoginProcedure = "/theoros.v1.KubernetesService/Login"
 	// KubernetesServiceExecuteCommandProcedure is the fully-qualified name of the KubernetesService's
 	// ExecuteCommand RPC.
 	KubernetesServiceExecuteCommandProcedure = "/theoros.v1.KubernetesService/ExecuteCommand"
@@ -43,6 +45,7 @@ const (
 
 // KubernetesServiceClient is a client for the theoros.v1.KubernetesService service.
 type KubernetesServiceClient interface {
+	Login(context.Context, *connect.Request[v1.LoginRequest]) (*connect.Response[v1.LoginResponse], error)
 	ExecuteCommand(context.Context, *connect.Request[v1.CommandRequest]) (*connect.Response[v1.CommandResponse], error)
 	InteractiveExec(context.Context) *connect.BidiStreamForClient[v1.ExecRequest, v1.ExecResponse]
 }
@@ -58,6 +61,12 @@ func NewKubernetesServiceClient(httpClient connect.HTTPClient, baseURL string, o
 	baseURL = strings.TrimRight(baseURL, "/")
 	kubernetesServiceMethods := v1.File_proto_theoros_v1_api_proto.Services().ByName("KubernetesService").Methods()
 	return &kubernetesServiceClient{
+		login: connect.NewClient[v1.LoginRequest, v1.LoginResponse](
+			httpClient,
+			baseURL+KubernetesServiceLoginProcedure,
+			connect.WithSchema(kubernetesServiceMethods.ByName("Login")),
+			connect.WithClientOptions(opts...),
+		),
 		executeCommand: connect.NewClient[v1.CommandRequest, v1.CommandResponse](
 			httpClient,
 			baseURL+KubernetesServiceExecuteCommandProcedure,
@@ -75,8 +84,14 @@ func NewKubernetesServiceClient(httpClient connect.HTTPClient, baseURL string, o
 
 // kubernetesServiceClient implements KubernetesServiceClient.
 type kubernetesServiceClient struct {
+	login           *connect.Client[v1.LoginRequest, v1.LoginResponse]
 	executeCommand  *connect.Client[v1.CommandRequest, v1.CommandResponse]
 	interactiveExec *connect.Client[v1.ExecRequest, v1.ExecResponse]
+}
+
+// Login calls theoros.v1.KubernetesService.Login.
+func (c *kubernetesServiceClient) Login(ctx context.Context, req *connect.Request[v1.LoginRequest]) (*connect.Response[v1.LoginResponse], error) {
+	return c.login.CallUnary(ctx, req)
 }
 
 // ExecuteCommand calls theoros.v1.KubernetesService.ExecuteCommand.
@@ -91,6 +106,7 @@ func (c *kubernetesServiceClient) InteractiveExec(ctx context.Context) *connect.
 
 // KubernetesServiceHandler is an implementation of the theoros.v1.KubernetesService service.
 type KubernetesServiceHandler interface {
+	Login(context.Context, *connect.Request[v1.LoginRequest]) (*connect.Response[v1.LoginResponse], error)
 	ExecuteCommand(context.Context, *connect.Request[v1.CommandRequest]) (*connect.Response[v1.CommandResponse], error)
 	InteractiveExec(context.Context, *connect.BidiStream[v1.ExecRequest, v1.ExecResponse]) error
 }
@@ -102,6 +118,12 @@ type KubernetesServiceHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewKubernetesServiceHandler(svc KubernetesServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	kubernetesServiceMethods := v1.File_proto_theoros_v1_api_proto.Services().ByName("KubernetesService").Methods()
+	kubernetesServiceLoginHandler := connect.NewUnaryHandler(
+		KubernetesServiceLoginProcedure,
+		svc.Login,
+		connect.WithSchema(kubernetesServiceMethods.ByName("Login")),
+		connect.WithHandlerOptions(opts...),
+	)
 	kubernetesServiceExecuteCommandHandler := connect.NewUnaryHandler(
 		KubernetesServiceExecuteCommandProcedure,
 		svc.ExecuteCommand,
@@ -116,6 +138,8 @@ func NewKubernetesServiceHandler(svc KubernetesServiceHandler, opts ...connect.H
 	)
 	return "/theoros.v1.KubernetesService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case KubernetesServiceLoginProcedure:
+			kubernetesServiceLoginHandler.ServeHTTP(w, r)
 		case KubernetesServiceExecuteCommandProcedure:
 			kubernetesServiceExecuteCommandHandler.ServeHTTP(w, r)
 		case KubernetesServiceInteractiveExecProcedure:
@@ -128,6 +152,10 @@ func NewKubernetesServiceHandler(svc KubernetesServiceHandler, opts ...connect.H
 
 // UnimplementedKubernetesServiceHandler returns CodeUnimplemented from all methods.
 type UnimplementedKubernetesServiceHandler struct{}
+
+func (UnimplementedKubernetesServiceHandler) Login(context.Context, *connect.Request[v1.LoginRequest]) (*connect.Response[v1.LoginResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("theoros.v1.KubernetesService.Login is not implemented"))
+}
 
 func (UnimplementedKubernetesServiceHandler) ExecuteCommand(context.Context, *connect.Request[v1.CommandRequest]) (*connect.Response[v1.CommandResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("theoros.v1.KubernetesService.ExecuteCommand is not implemented"))
