@@ -6,10 +6,10 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: ghcr.io/giannisstathoudakis
-    chart: theoros-server
-    targetRevision: latest
-
+    repoURL: 'https://github.com/GiannisStathoudakis/Theoros.git'
+    targetRevision: master 
+    path: chart 
+    
   destination:
     server: https://kubernetes.default.svc
     namespace: theoros
