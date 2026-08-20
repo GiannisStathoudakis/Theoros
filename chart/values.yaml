@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/giannisstathoudakis
+  repository: ghcr.io/giannisstathoudakis/theoros-server
   pullPolicy: IfNotPresent
   tag: "latest"
 
