@@ -19,6 +19,8 @@ spec:
             path: Apps/Envoy
           - app: argocd
             path: Apps/ArgoCD
+          - app: theoros
+            path: Apps/Theoros
 
   template:
     metadata:

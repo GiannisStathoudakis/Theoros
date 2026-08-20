@@ -1,0 +1,18 @@
+apiVersion: external-secrets.io/v1 
+kind: ExternalSecret
+metadata:
+  name: theoros-jwt-token
+  namespace: theoros
+spec:
+  refreshInterval: "1h"
+  secretStoreRef:
+    name: theoros-jwt
+    kind: ClusterSecretStore
+  target:
+    name: theoros-jwt
+    creationPolicy: Owner
+  data:
+    - secretKey: jwt.key
+      remoteRef:
+        key: Theoros
+        property: token
