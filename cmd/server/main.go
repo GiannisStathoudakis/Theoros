@@ -16,8 +16,8 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/golang-jwt/jwt/v5"
-	_ "github.com/mattn/go-sqlite3" // SQLite Driver
 	"golang.org/x/crypto/bcrypt"
+	_ "modernc.org/sqlite" // SQLite Driver
 
 	// Kubernetes client-go
 	corev1 "k8s.io/api/core/v1"
@@ -114,7 +114,7 @@ func initDB(dbPath, bootstrapUser, bootstrapPass string) *sql.DB {
 	file.Close()
 	os.Chmod(dbPath, 0600)
 
-	db, err := sql.Open("sqlite3", dbPath)
+	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
 		log.Fatalf("Fatal: Failed to open SQLite database: %v", err)
 	}
