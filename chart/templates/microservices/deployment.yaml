@@ -15,13 +15,25 @@ spec:
         {{- include "theoros.selectorLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "theoros.serviceAccountName" . }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
           
           volumeMounts:
-            - name: jwt-secret-volume
-              mountPath: "/etc/theoros/secrets"
+            - name: db-storage
+              mountPath: /data
+            - name: tmp-dir
+              mountPath: /tmp
+            - name: bootstrap-secret
+              mountPath: /etc/theoros/bootstrap
               readOnly: true
               
           ports:
@@ -30,6 +42,11 @@ spec:
               protocol: TCP
               
       volumes:
-        - name: jwt-secret-volume
+        - name: db-storage
+          persistentVolumeClaim:
+            claimName: {{ include "theoros.fullname" . }}-db-pvc
+        - name: tmp-dir
+          emptyDir: {}
+        - name: bootstrap-secret
           secret:
-            secretName: theoros-jwt
+            secretName: theoros-cred

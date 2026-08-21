@@ -10,9 +10,13 @@ serviceAccount:
   name: ""
 
 rbac:
-  create: trues
+  create: true
 
 service:
   type: ClusterIP
   port: 8080
   targetPort: 8080
+
+bootstrap:
+  username: "admin"
+  password: "super_secure_bootstrap_password" 

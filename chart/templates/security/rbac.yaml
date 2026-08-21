@@ -1,0 +1,25 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "theoros.fullname" . }}-secret-manager
+  labels:
+    {{- include "theoros.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "create", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "theoros.fullname" . }}-secret-manager-binding
+  labels:
+    {{- include "theoros.labels" . | nindent 4 }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "theoros.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ include "theoros.fullname" . }}-secret-manager
+  apiGroup: rbac.authorization.k8s.io
