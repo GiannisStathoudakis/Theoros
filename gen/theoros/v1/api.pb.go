@@ -598,6 +598,94 @@ func (x *DeleteUserResponse) GetMessage() string {
 	return ""
 }
 
+type GetCompletionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Args          []string               `protobuf:"bytes,1,rep,name=args,proto3" json:"args,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCompletionsRequest) Reset() {
+	*x = GetCompletionsRequest{}
+	mi := &file_proto_theoros_v1_api_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCompletionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCompletionsRequest) ProtoMessage() {}
+
+func (x *GetCompletionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_theoros_v1_api_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCompletionsRequest.ProtoReflect.Descriptor instead.
+func (*GetCompletionsRequest) Descriptor() ([]byte, []int) {
+	return file_proto_theoros_v1_api_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *GetCompletionsRequest) GetArgs() []string {
+	if x != nil {
+		return x.Args
+	}
+	return nil
+}
+
+type GetCompletionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Suggestions   []string               `protobuf:"bytes,1,rep,name=suggestions,proto3" json:"suggestions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCompletionsResponse) Reset() {
+	*x = GetCompletionsResponse{}
+	mi := &file_proto_theoros_v1_api_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCompletionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCompletionsResponse) ProtoMessage() {}
+
+func (x *GetCompletionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_theoros_v1_api_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCompletionsResponse.ProtoReflect.Descriptor instead.
+func (*GetCompletionsResponse) Descriptor() ([]byte, []int) {
+	return file_proto_theoros_v1_api_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *GetCompletionsResponse) GetSuggestions() []string {
+	if x != nil {
+		return x.Suggestions
+	}
+	return nil
+}
+
 var File_proto_theoros_v1_api_proto protoreflect.FileDescriptor
 
 const file_proto_theoros_v1_api_proto_rawDesc = "" +
@@ -636,7 +724,11 @@ const file_proto_theoros_v1_api_proto_rawDesc = "" +
 	"\x11DeleteUserRequest\x12\x1a\n" +
 	"\busername\x18\x01 \x01(\tR\busername\".\n" +
 	"\x12DeleteUserResponse\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage2\xd3\x03\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\"+\n" +
+	"\x15GetCompletionsRequest\x12\x12\n" +
+	"\x04args\x18\x01 \x03(\tR\x04args\":\n" +
+	"\x16GetCompletionsResponse\x12 \n" +
+	"\vsuggestions\x18\x01 \x03(\tR\vsuggestions2\xac\x04\n" +
 	"\x11KubernetesService\x12<\n" +
 	"\x05Login\x12\x18.theoros.v1.LoginRequest\x1a\x19.theoros.v1.LoginResponse\x12I\n" +
 	"\x0eExecuteCommand\x12\x1a.theoros.v1.CommandRequest\x1a\x1b.theoros.v1.CommandResponse\x12H\n" +
@@ -644,7 +736,8 @@ const file_proto_theoros_v1_api_proto_rawDesc = "" +
 	"\rGenerateToken\x12 .theoros.v1.GenerateTokenRequest\x1a!.theoros.v1.GenerateTokenResponse\x12H\n" +
 	"\tListUsers\x12\x1c.theoros.v1.ListUsersRequest\x1a\x1d.theoros.v1.ListUsersResponse\x12K\n" +
 	"\n" +
-	"DeleteUser\x12\x1d.theoros.v1.DeleteUserRequest\x1a\x1e.theoros.v1.DeleteUserResponseB7Z5github.com/GiannisStathoudakis/Theoros/gen/theoros/v1b\x06proto3"
+	"DeleteUser\x12\x1d.theoros.v1.DeleteUserRequest\x1a\x1e.theoros.v1.DeleteUserResponse\x12W\n" +
+	"\x0eGetCompletions\x12!.theoros.v1.GetCompletionsRequest\x1a\".theoros.v1.GetCompletionsResponseB7Z5github.com/GiannisStathoudakis/Theoros/gen/theoros/v1b\x06proto3"
 
 var (
 	file_proto_theoros_v1_api_proto_rawDescOnce sync.Once
@@ -658,20 +751,22 @@ func file_proto_theoros_v1_api_proto_rawDescGZIP() []byte {
 	return file_proto_theoros_v1_api_proto_rawDescData
 }
 
-var file_proto_theoros_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
+var file_proto_theoros_v1_api_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_proto_theoros_v1_api_proto_goTypes = []any{
-	(*LoginRequest)(nil),          // 0: theoros.v1.LoginRequest
-	(*LoginResponse)(nil),         // 1: theoros.v1.LoginResponse
-	(*CommandRequest)(nil),        // 2: theoros.v1.CommandRequest
-	(*CommandResponse)(nil),       // 3: theoros.v1.CommandResponse
-	(*ExecRequest)(nil),           // 4: theoros.v1.ExecRequest
-	(*ExecResponse)(nil),          // 5: theoros.v1.ExecResponse
-	(*GenerateTokenRequest)(nil),  // 6: theoros.v1.GenerateTokenRequest
-	(*GenerateTokenResponse)(nil), // 7: theoros.v1.GenerateTokenResponse
-	(*ListUsersRequest)(nil),      // 8: theoros.v1.ListUsersRequest
-	(*ListUsersResponse)(nil),     // 9: theoros.v1.ListUsersResponse
-	(*DeleteUserRequest)(nil),     // 10: theoros.v1.DeleteUserRequest
-	(*DeleteUserResponse)(nil),    // 11: theoros.v1.DeleteUserResponse
+	(*LoginRequest)(nil),           // 0: theoros.v1.LoginRequest
+	(*LoginResponse)(nil),          // 1: theoros.v1.LoginResponse
+	(*CommandRequest)(nil),         // 2: theoros.v1.CommandRequest
+	(*CommandResponse)(nil),        // 3: theoros.v1.CommandResponse
+	(*ExecRequest)(nil),            // 4: theoros.v1.ExecRequest
+	(*ExecResponse)(nil),           // 5: theoros.v1.ExecResponse
+	(*GenerateTokenRequest)(nil),   // 6: theoros.v1.GenerateTokenRequest
+	(*GenerateTokenResponse)(nil),  // 7: theoros.v1.GenerateTokenResponse
+	(*ListUsersRequest)(nil),       // 8: theoros.v1.ListUsersRequest
+	(*ListUsersResponse)(nil),      // 9: theoros.v1.ListUsersResponse
+	(*DeleteUserRequest)(nil),      // 10: theoros.v1.DeleteUserRequest
+	(*DeleteUserResponse)(nil),     // 11: theoros.v1.DeleteUserResponse
+	(*GetCompletionsRequest)(nil),  // 12: theoros.v1.GetCompletionsRequest
+	(*GetCompletionsResponse)(nil), // 13: theoros.v1.GetCompletionsResponse
 }
 var file_proto_theoros_v1_api_proto_depIdxs = []int32{
 	0,  // 0: theoros.v1.KubernetesService.Login:input_type -> theoros.v1.LoginRequest
@@ -680,14 +775,16 @@ var file_proto_theoros_v1_api_proto_depIdxs = []int32{
 	6,  // 3: theoros.v1.KubernetesService.GenerateToken:input_type -> theoros.v1.GenerateTokenRequest
 	8,  // 4: theoros.v1.KubernetesService.ListUsers:input_type -> theoros.v1.ListUsersRequest
 	10, // 5: theoros.v1.KubernetesService.DeleteUser:input_type -> theoros.v1.DeleteUserRequest
-	1,  // 6: theoros.v1.KubernetesService.Login:output_type -> theoros.v1.LoginResponse
-	3,  // 7: theoros.v1.KubernetesService.ExecuteCommand:output_type -> theoros.v1.CommandResponse
-	5,  // 8: theoros.v1.KubernetesService.InteractiveExec:output_type -> theoros.v1.ExecResponse
-	7,  // 9: theoros.v1.KubernetesService.GenerateToken:output_type -> theoros.v1.GenerateTokenResponse
-	9,  // 10: theoros.v1.KubernetesService.ListUsers:output_type -> theoros.v1.ListUsersResponse
-	11, // 11: theoros.v1.KubernetesService.DeleteUser:output_type -> theoros.v1.DeleteUserResponse
-	6,  // [6:12] is the sub-list for method output_type
-	0,  // [0:6] is the sub-list for method input_type
+	12, // 6: theoros.v1.KubernetesService.GetCompletions:input_type -> theoros.v1.GetCompletionsRequest
+	1,  // 7: theoros.v1.KubernetesService.Login:output_type -> theoros.v1.LoginResponse
+	3,  // 8: theoros.v1.KubernetesService.ExecuteCommand:output_type -> theoros.v1.CommandResponse
+	5,  // 9: theoros.v1.KubernetesService.InteractiveExec:output_type -> theoros.v1.ExecResponse
+	7,  // 10: theoros.v1.KubernetesService.GenerateToken:output_type -> theoros.v1.GenerateTokenResponse
+	9,  // 11: theoros.v1.KubernetesService.ListUsers:output_type -> theoros.v1.ListUsersResponse
+	11, // 12: theoros.v1.KubernetesService.DeleteUser:output_type -> theoros.v1.DeleteUserResponse
+	13, // 13: theoros.v1.KubernetesService.GetCompletions:output_type -> theoros.v1.GetCompletionsResponse
+	7,  // [7:14] is the sub-list for method output_type
+	0,  // [0:7] is the sub-list for method input_type
 	0,  // [0:0] is the sub-list for extension type_name
 	0,  // [0:0] is the sub-list for extension extendee
 	0,  // [0:0] is the sub-list for field type_name
@@ -704,7 +801,7 @@ func file_proto_theoros_v1_api_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_theoros_v1_api_proto_rawDesc), len(file_proto_theoros_v1_api_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   12,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

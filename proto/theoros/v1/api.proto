@@ -13,6 +13,9 @@ service KubernetesService {
   rpc GenerateToken(GenerateTokenRequest) returns (GenerateTokenResponse);
   rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
   rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
+
+  // Autocompletion Engine
+  rpc GetCompletions(GetCompletionsRequest) returns (GetCompletionsResponse);
 }
 
 message LoginRequest {
@@ -67,4 +70,12 @@ message DeleteUserRequest {
 
 message DeleteUserResponse {
   string message = 1;
+}
+
+message GetCompletionsRequest {
+  repeated string args = 1; 
+}
+
+message GetCompletionsResponse {
+  repeated string suggestions = 1; 
 }

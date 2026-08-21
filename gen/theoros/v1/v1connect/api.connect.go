@@ -50,6 +50,9 @@ const (
 	// KubernetesServiceDeleteUserProcedure is the fully-qualified name of the KubernetesService's
 	// DeleteUser RPC.
 	KubernetesServiceDeleteUserProcedure = "/theoros.v1.KubernetesService/DeleteUser"
+	// KubernetesServiceGetCompletionsProcedure is the fully-qualified name of the KubernetesService's
+	// GetCompletions RPC.
+	KubernetesServiceGetCompletionsProcedure = "/theoros.v1.KubernetesService/GetCompletions"
 )
 
 // KubernetesServiceClient is a client for the theoros.v1.KubernetesService service.
@@ -61,6 +64,8 @@ type KubernetesServiceClient interface {
 	GenerateToken(context.Context, *connect.Request[v1.GenerateTokenRequest]) (*connect.Response[v1.GenerateTokenResponse], error)
 	ListUsers(context.Context, *connect.Request[v1.ListUsersRequest]) (*connect.Response[v1.ListUsersResponse], error)
 	DeleteUser(context.Context, *connect.Request[v1.DeleteUserRequest]) (*connect.Response[v1.DeleteUserResponse], error)
+	// Autocompletion Engine
+	GetCompletions(context.Context, *connect.Request[v1.GetCompletionsRequest]) (*connect.Response[v1.GetCompletionsResponse], error)
 }
 
 // NewKubernetesServiceClient constructs a client for the theoros.v1.KubernetesService service. By
@@ -110,6 +115,12 @@ func NewKubernetesServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(kubernetesServiceMethods.ByName("DeleteUser")),
 			connect.WithClientOptions(opts...),
 		),
+		getCompletions: connect.NewClient[v1.GetCompletionsRequest, v1.GetCompletionsResponse](
+			httpClient,
+			baseURL+KubernetesServiceGetCompletionsProcedure,
+			connect.WithSchema(kubernetesServiceMethods.ByName("GetCompletions")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -121,6 +132,7 @@ type kubernetesServiceClient struct {
 	generateToken   *connect.Client[v1.GenerateTokenRequest, v1.GenerateTokenResponse]
 	listUsers       *connect.Client[v1.ListUsersRequest, v1.ListUsersResponse]
 	deleteUser      *connect.Client[v1.DeleteUserRequest, v1.DeleteUserResponse]
+	getCompletions  *connect.Client[v1.GetCompletionsRequest, v1.GetCompletionsResponse]
 }
 
 // Login calls theoros.v1.KubernetesService.Login.
@@ -153,6 +165,11 @@ func (c *kubernetesServiceClient) DeleteUser(ctx context.Context, req *connect.R
 	return c.deleteUser.CallUnary(ctx, req)
 }
 
+// GetCompletions calls theoros.v1.KubernetesService.GetCompletions.
+func (c *kubernetesServiceClient) GetCompletions(ctx context.Context, req *connect.Request[v1.GetCompletionsRequest]) (*connect.Response[v1.GetCompletionsResponse], error) {
+	return c.getCompletions.CallUnary(ctx, req)
+}
+
 // KubernetesServiceHandler is an implementation of the theoros.v1.KubernetesService service.
 type KubernetesServiceHandler interface {
 	Login(context.Context, *connect.Request[v1.LoginRequest]) (*connect.Response[v1.LoginResponse], error)
@@ -162,6 +179,8 @@ type KubernetesServiceHandler interface {
 	GenerateToken(context.Context, *connect.Request[v1.GenerateTokenRequest]) (*connect.Response[v1.GenerateTokenResponse], error)
 	ListUsers(context.Context, *connect.Request[v1.ListUsersRequest]) (*connect.Response[v1.ListUsersResponse], error)
 	DeleteUser(context.Context, *connect.Request[v1.DeleteUserRequest]) (*connect.Response[v1.DeleteUserResponse], error)
+	// Autocompletion Engine
+	GetCompletions(context.Context, *connect.Request[v1.GetCompletionsRequest]) (*connect.Response[v1.GetCompletionsResponse], error)
 }
 
 // NewKubernetesServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -207,6 +226,12 @@ func NewKubernetesServiceHandler(svc KubernetesServiceHandler, opts ...connect.H
 		connect.WithSchema(kubernetesServiceMethods.ByName("DeleteUser")),
 		connect.WithHandlerOptions(opts...),
 	)
+	kubernetesServiceGetCompletionsHandler := connect.NewUnaryHandler(
+		KubernetesServiceGetCompletionsProcedure,
+		svc.GetCompletions,
+		connect.WithSchema(kubernetesServiceMethods.ByName("GetCompletions")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/theoros.v1.KubernetesService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case KubernetesServiceLoginProcedure:
@@ -221,6 +246,8 @@ func NewKubernetesServiceHandler(svc KubernetesServiceHandler, opts ...connect.H
 			kubernetesServiceListUsersHandler.ServeHTTP(w, r)
 		case KubernetesServiceDeleteUserProcedure:
 			kubernetesServiceDeleteUserHandler.ServeHTTP(w, r)
+		case KubernetesServiceGetCompletionsProcedure:
+			kubernetesServiceGetCompletionsHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -252,4 +279,8 @@ func (UnimplementedKubernetesServiceHandler) ListUsers(context.Context, *connect
 
 func (UnimplementedKubernetesServiceHandler) DeleteUser(context.Context, *connect.Request[v1.DeleteUserRequest]) (*connect.Response[v1.DeleteUserResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("theoros.v1.KubernetesService.DeleteUser is not implemented"))
+}
+
+func (UnimplementedKubernetesServiceHandler) GetCompletions(context.Context, *connect.Request[v1.GetCompletionsRequest]) (*connect.Response[v1.GetCompletionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("theoros.v1.KubernetesService.GetCompletions is not implemented"))
 }
