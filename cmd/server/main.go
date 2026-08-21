@@ -457,3 +457,58 @@ func (s *TheorosServer) DeleteUser(
 		Message: fmt.Sprintf("User '%s' deleted successfully", username),
 	}), nil
 }
+
+// ==========================================
+// AUTOCOMPLETION ENGINE
+// ==========================================
+func (s *TheorosServer) GetCompletions(
+	ctx context.Context,
+	req *connect.Request[pb.GetCompletionsRequest],
+) (*connect.Response[pb.GetCompletionsResponse], error) {
+
+	// Prepare the hidden __complete command
+	cmdArgs := append([]string{"__complete"}, req.Msg.Args...)
+
+	var outBuf bytes.Buffer
+	var errBuf bytes.Buffer
+
+	ioStreams := genericclioptions.IOStreams{
+		In:     bytes.NewReader(nil),
+		Out:    &outBuf,
+		ErrOut: &errBuf,
+	}
+
+	kubectlOptions := cmd.KubectlOptions{
+		Arguments:   cmdArgs,
+		ConfigFlags: genericclioptions.NewConfigFlags(true),
+		IOStreams:   ioStreams,
+	}
+
+	rootCmd := cmd.NewKubectlCommand(kubectlOptions)
+	rootCmd.SetArgs(cmdArgs)
+	rootCmd.SilenceUsage = true
+	rootCmd.SilenceErrors = true
+
+	// Execute the hidden autocomplete command in-memory
+	_ = rootCmd.Execute()
+
+	// Parse the output and clean up Bash directives
+	rawLines := strings.Split(outBuf.String(), "\n")
+	var suggestions []string
+
+	for _, line := range rawLines {
+		line = strings.TrimSpace(line)
+
+		if line == "" || strings.HasPrefix(line, ":") {
+			continue
+		}
+
+		parts := strings.SplitN(line, "\t", 2)
+		cleanSuggestion := strings.TrimSpace(parts[0])
+		suggestions = append(suggestions, cleanSuggestion)
+	}
+
+	return connect.NewResponse(&pb.GetCompletionsResponse{
+		Suggestions: suggestions,
+	}), nil
+}
