@@ -225,6 +225,15 @@ func (s *TheorosServer) ExecuteCommand(
 	log.Printf("[Audit] Executing: %s %s (namespace: '%s', flags: %v)",
 		req.Msg.Action, req.Msg.Resource, req.Msg.Namespace, req.Msg.Flags)
 
+	for _, flag := range req.Msg.Flags {
+		if flag == "-w" || flag == "--watch" || flag == "-f" || flag == "--follow" {
+			return nil, connect.NewError(
+				connect.CodeInvalidArgument,
+				errors.New("streaming flags (-w, --watch, -f, --follow) must be executed via the InteractiveExec streaming endpoint."),
+			)
+		}
+	}
+
 	args := []string{req.Msg.Action}
 
 	if req.Msg.Resource != "" {
@@ -281,13 +290,94 @@ func (s *TheorosServer) ExecuteCommand(
 	return connect.NewResponse(&pb.CommandResponse{Output: finalOutput}), nil
 }
 
+// ==========================================
+// STREAMING INTERACTIVE ENGINE
+// ==========================================
+type streamWriter struct {
+	isStderr bool
+	stream   *connect.BidiStream[pb.ExecRequest, pb.ExecResponse]
+}
+
+func (w *streamWriter) Write(p []byte) (n int, err error) {
+	resp := &pb.ExecResponse{}
+	if w.isStderr {
+		resp.Stderr = p
+	} else {
+		resp.Stdout = p
+	}
+
+	err = w.stream.Send(resp)
+	return len(p), err
+}
+
 func (s *TheorosServer) InteractiveExec(
 	ctx context.Context,
 	stream *connect.BidiStream[pb.ExecRequest, pb.ExecResponse],
 ) error {
-	return connect.NewError(connect.CodeUnimplemented, errors.New("interactive exec coming soon"))
+
+	// Wait for the client to send the FIRST packet
+	req, err := stream.Receive()
+	if err != nil {
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("failed to read stream start: %v", err))
+	}
+
+	log.Printf("[Audit-Stream] Starting stream: %s %s (namespace: '%s', flags: %v)",
+		req.Action, req.Resource, req.Namespace, req.Flags)
+
+	// Build the command arguments
+	args := []string{req.Action}
+	if req.Resource != "" {
+		args = append(args, req.Resource)
+	}
+	if req.Name != "" {
+		args = append(args, req.Name)
+	}
+	if req.Namespace != "" {
+		args = append(args, "-n", req.Namespace)
+	}
+	if len(req.Flags) > 0 {
+		args = append(args, req.Flags...)
+	}
+
+	// Inject our Fake Terminal Writers!
+	ioStreams := genericclioptions.IOStreams{
+		In:     bytes.NewReader(nil), // We will handle two-way typing later
+		Out:    &streamWriter{isStderr: false, stream: stream},
+		ErrOut: &streamWriter{isStderr: true, stream: stream},
+	}
+
+	kubectlOptions := cmd.KubectlOptions{
+		Arguments:   args,
+		ConfigFlags: genericclioptions.NewConfigFlags(true),
+		IOStreams:   ioStreams,
+	}
+
+	kubectlCmd := cmd.NewKubectlCommand(kubectlOptions)
+	kubectlCmd.SetArgs(args)
+	kubectlCmd.SilenceUsage = true
+	kubectlCmd.SilenceErrors = true
+
+	// Shield against panics inside the stream
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[Audit-Stream] Stream recovered from panic: %v", r)
+		}
+	}()
+
+	// Execute the command.
+	err = kubectlCmd.Execute()
+
+	if err != nil {
+		return connect.NewError(connect.CodeUnknown, err)
+	}
+
+	log.Printf("[Audit-Stream] Stream closed cleanly for: %s", req.Action)
+	return nil
 }
 
+// ==========================================
+// SERVER INITIALIZATION & AUTH
+// ==========================================
 func NewAuthInterceptor(secretKey []byte) connect.UnaryInterceptorFunc {
 	return func(next connect.UnaryFunc) connect.UnaryFunc {
 		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
