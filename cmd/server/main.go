@@ -486,6 +486,10 @@ func (s *TheorosServer) GetCompletions(
 
 	rootCmd := cmd.NewKubectlCommand(kubectlOptions)
 	rootCmd.SetArgs(cmdArgs)
+
+	rootCmd.SetOut(&outBuf)
+	rootCmd.SetErr(&errBuf)
+
 	rootCmd.SilenceUsage = true
 	rootCmd.SilenceErrors = true
 
