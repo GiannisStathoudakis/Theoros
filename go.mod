@@ -6,9 +6,14 @@ require (
 	connectrpc.com/connect v1.20.0
 	github.com/c-bata/go-prompt v0.2.6
 	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/mattn/go-sqlite3 v1.14.50
+	golang.org/x/crypto v0.55.0
 	golang.org/x/term v0.45.0
 	google.golang.org/protobuf v1.36.12-0.20260120151049-f2248ac996af
+	k8s.io/api v0.36.3
+	k8s.io/apimachinery v0.36.3
 	k8s.io/cli-runtime v0.36.3
+	k8s.io/client-go v0.36.3
 	k8s.io/kubectl v0.36.3
 )
 
@@ -71,9 +76,6 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/api v0.36.3 // indirect
-	k8s.io/apimachinery v0.36.3 // indirect
-	k8s.io/client-go v0.36.3 // indirect
 	k8s.io/component-base v0.36.3 // indirect
 	k8s.io/component-helpers v0.36.3 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
