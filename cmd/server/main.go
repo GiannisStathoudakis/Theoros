@@ -293,57 +293,49 @@ func (s *TheorosServer) ExecuteCommand(
 // ==========================================
 // STREAMING INTERACTIVE ENGINE
 // ==========================================
-type streamWriter struct {
+type serverStreamWriter struct {
 	isStderr bool
-	stream   *connect.BidiStream[pb.ExecRequest, pb.ExecResponse]
+	stream   *connect.ServerStream[pb.ExecResponse]
 }
 
-func (w *streamWriter) Write(p []byte) (n int, err error) {
+func (w *serverStreamWriter) Write(p []byte) (n int, err error) {
 	resp := &pb.ExecResponse{}
 	if w.isStderr {
 		resp.Stderr = p
 	} else {
 		resp.Stdout = p
 	}
-
 	err = w.stream.Send(resp)
 	return len(p), err
 }
 
 func (s *TheorosServer) InteractiveExec(
 	ctx context.Context,
-	stream *connect.BidiStream[pb.ExecRequest, pb.ExecResponse],
+	req *connect.Request[pb.ExecRequest],
+	stream *connect.ServerStream[pb.ExecResponse],
 ) error {
 
-	// Wait for the client to send the FIRST packet
-	req, err := stream.Receive()
-	if err != nil {
-		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("failed to read stream start: %v", err))
+	log.Printf("[Audit-Stream] Starting Server Stream: %s %s (namespace: '%s', flags: %v)",
+		req.Msg.Action, req.Msg.Resource, req.Msg.Namespace, req.Msg.Flags)
+
+	args := []string{req.Msg.Action}
+	if req.Msg.Resource != "" {
+		args = append(args, req.Msg.Resource)
+	}
+	if req.Msg.Name != "" {
+		args = append(args, req.Msg.Name)
+	}
+	if req.Msg.Namespace != "" {
+		args = append(args, "-n", req.Msg.Namespace)
+	}
+	if len(req.Msg.Flags) > 0 {
+		args = append(args, req.Msg.Flags...)
 	}
 
-	log.Printf("[Audit-Stream] Starting stream: %s %s (namespace: '%s', flags: %v)",
-		req.Action, req.Resource, req.Namespace, req.Flags)
-
-	// Build the command arguments
-	args := []string{req.Action}
-	if req.Resource != "" {
-		args = append(args, req.Resource)
-	}
-	if req.Name != "" {
-		args = append(args, req.Name)
-	}
-	if req.Namespace != "" {
-		args = append(args, "-n", req.Namespace)
-	}
-	if len(req.Flags) > 0 {
-		args = append(args, req.Flags...)
-	}
-
-	// Inject our Fake Terminal Writers!
 	ioStreams := genericclioptions.IOStreams{
-		In:     bytes.NewReader(nil), // We will handle two-way typing later
-		Out:    &streamWriter{isStderr: false, stream: stream},
-		ErrOut: &streamWriter{isStderr: true, stream: stream},
+		In:     bytes.NewReader(nil),
+		Out:    &serverStreamWriter{isStderr: false, stream: stream},
+		ErrOut: &serverStreamWriter{isStderr: true, stream: stream},
 	}
 
 	kubectlOptions := cmd.KubectlOptions{
@@ -357,21 +349,18 @@ func (s *TheorosServer) InteractiveExec(
 	kubectlCmd.SilenceUsage = true
 	kubectlCmd.SilenceErrors = true
 
-	// Shield against panics inside the stream
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("[Audit-Stream] Stream recovered from panic: %v", r)
 		}
 	}()
 
-	// Execute the command.
-	err = kubectlCmd.Execute()
-
+	err := kubectlCmd.Execute()
 	if err != nil {
 		return connect.NewError(connect.CodeUnknown, err)
 	}
 
-	log.Printf("[Audit-Stream] Stream closed cleanly for: %s", req.Action)
+	log.Printf("[Audit-Stream] Stream closed cleanly for: %s", req.Msg.Action)
 	return nil
 }
 
