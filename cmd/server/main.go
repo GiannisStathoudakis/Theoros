@@ -261,7 +261,7 @@ func (s *TheorosServer) ExecuteCommand(
 	kubectlCmd.SilenceUsage = true
 	kubectlCmd.SilenceErrors = true
 
-	err := kubectlCmd.Execute()
+	err = kubectlCmd.Execute()
 
 	finalOutput := outBuf.String()
 	if errBuf.Len() > 0 {
