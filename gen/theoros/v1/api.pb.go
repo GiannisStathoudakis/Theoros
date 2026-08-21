@@ -231,9 +231,12 @@ func (x *CommandResponse) GetOutput() string {
 
 type ExecRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	PodName       string                 `protobuf:"bytes,1,opt,name=pod_name,json=podName,proto3" json:"pod_name,omitempty"`
-	Namespace     string                 `protobuf:"bytes,2,opt,name=namespace,proto3" json:"namespace,omitempty"`
-	StdinData     []byte                 `protobuf:"bytes,3,opt,name=stdin_data,json=stdinData,proto3" json:"stdin_data,omitempty"`
+	Action        string                 `protobuf:"bytes,1,opt,name=action,proto3" json:"action,omitempty"`
+	Resource      string                 `protobuf:"bytes,2,opt,name=resource,proto3" json:"resource,omitempty"`
+	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Namespace     string                 `protobuf:"bytes,4,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Flags         []string               `protobuf:"bytes,5,rep,name=flags,proto3" json:"flags,omitempty"`
+	Stdin         []byte                 `protobuf:"bytes,6,opt,name=stdin,proto3" json:"stdin,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -268,9 +271,23 @@ func (*ExecRequest) Descriptor() ([]byte, []int) {
 	return file_proto_theoros_v1_api_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *ExecRequest) GetPodName() string {
+func (x *ExecRequest) GetAction() string {
 	if x != nil {
-		return x.PodName
+		return x.Action
+	}
+	return ""
+}
+
+func (x *ExecRequest) GetResource() string {
+	if x != nil {
+		return x.Resource
+	}
+	return ""
+}
+
+func (x *ExecRequest) GetName() string {
+	if x != nil {
+		return x.Name
 	}
 	return ""
 }
@@ -282,17 +299,24 @@ func (x *ExecRequest) GetNamespace() string {
 	return ""
 }
 
-func (x *ExecRequest) GetStdinData() []byte {
+func (x *ExecRequest) GetFlags() []string {
 	if x != nil {
-		return x.StdinData
+		return x.Flags
+	}
+	return nil
+}
+
+func (x *ExecRequest) GetStdin() []byte {
+	if x != nil {
+		return x.Stdin
 	}
 	return nil
 }
 
 type ExecResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	StdoutData    []byte                 `protobuf:"bytes,1,opt,name=stdout_data,json=stdoutData,proto3" json:"stdout_data,omitempty"`
-	StderrData    []byte                 `protobuf:"bytes,2,opt,name=stderr_data,json=stderrData,proto3" json:"stderr_data,omitempty"`
+	Stdout        []byte                 `protobuf:"bytes,1,opt,name=stdout,proto3" json:"stdout,omitempty"`
+	Stderr        []byte                 `protobuf:"bytes,2,opt,name=stderr,proto3" json:"stderr,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -327,16 +351,16 @@ func (*ExecResponse) Descriptor() ([]byte, []int) {
 	return file_proto_theoros_v1_api_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *ExecResponse) GetStdoutData() []byte {
+func (x *ExecResponse) GetStdout() []byte {
 	if x != nil {
-		return x.StdoutData
+		return x.Stdout
 	}
 	return nil
 }
 
-func (x *ExecResponse) GetStderrData() []byte {
+func (x *ExecResponse) GetStderr() []byte {
 	if x != nil {
-		return x.StderrData
+		return x.Stderr
 	}
 	return nil
 }
@@ -703,17 +727,17 @@ const file_proto_theoros_v1_api_proto_rawDesc = "" +
 	"\tnamespace\x18\x04 \x01(\tR\tnamespace\x12\x14\n" +
 	"\x05flags\x18\x05 \x03(\tR\x05flags\")\n" +
 	"\x0fCommandResponse\x12\x16\n" +
-	"\x06output\x18\x01 \x01(\tR\x06output\"e\n" +
-	"\vExecRequest\x12\x19\n" +
-	"\bpod_name\x18\x01 \x01(\tR\apodName\x12\x1c\n" +
-	"\tnamespace\x18\x02 \x01(\tR\tnamespace\x12\x1d\n" +
-	"\n" +
-	"stdin_data\x18\x03 \x01(\fR\tstdinData\"P\n" +
-	"\fExecResponse\x12\x1f\n" +
-	"\vstdout_data\x18\x01 \x01(\fR\n" +
-	"stdoutData\x12\x1f\n" +
-	"\vstderr_data\x18\x02 \x01(\fR\n" +
-	"stderrData\"2\n" +
+	"\x06output\x18\x01 \x01(\tR\x06output\"\x9f\x01\n" +
+	"\vExecRequest\x12\x16\n" +
+	"\x06action\x18\x01 \x01(\tR\x06action\x12\x1a\n" +
+	"\bresource\x18\x02 \x01(\tR\bresource\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12\x1c\n" +
+	"\tnamespace\x18\x04 \x01(\tR\tnamespace\x12\x14\n" +
+	"\x05flags\x18\x05 \x03(\tR\x05flags\x12\x14\n" +
+	"\x05stdin\x18\x06 \x01(\fR\x05stdin\">\n" +
+	"\fExecResponse\x12\x16\n" +
+	"\x06stdout\x18\x01 \x01(\fR\x06stdout\x12\x16\n" +
+	"\x06stderr\x18\x02 \x01(\fR\x06stderr\"2\n" +
 	"\x14GenerateTokenRequest\x12\x1a\n" +
 	"\busername\x18\x01 \x01(\tR\busername\"-\n" +
 	"\x15GenerateTokenResponse\x12\x14\n" +

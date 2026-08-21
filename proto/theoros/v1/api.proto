@@ -39,14 +39,17 @@ message CommandResponse {
 }
 
 message ExecRequest {
-  string pod_name = 1;
-  string namespace = 2;
-  bytes stdin_data = 3; 
+  string action = 1;
+  string resource = 2;
+  string name = 3;
+  string namespace = 4;
+  repeated string flags = 5;
+  bytes stdin = 6; 
 }
 
 message ExecResponse {
-  bytes stdout_data = 1;
-  bytes stderr_data = 2;
+  bytes stdout = 1;
+  bytes stderr = 2;
 }
 
 // User Management Messages
