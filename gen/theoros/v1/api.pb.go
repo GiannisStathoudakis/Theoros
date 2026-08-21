@@ -752,11 +752,11 @@ const file_proto_theoros_v1_api_proto_rawDesc = "" +
 	"\x15GetCompletionsRequest\x12\x12\n" +
 	"\x04args\x18\x01 \x03(\tR\x04args\":\n" +
 	"\x16GetCompletionsResponse\x12 \n" +
-	"\vsuggestions\x18\x01 \x03(\tR\vsuggestions2\xac\x04\n" +
+	"\vsuggestions\x18\x01 \x03(\tR\vsuggestions2\xaa\x04\n" +
 	"\x11KubernetesService\x12<\n" +
 	"\x05Login\x12\x18.theoros.v1.LoginRequest\x1a\x19.theoros.v1.LoginResponse\x12I\n" +
-	"\x0eExecuteCommand\x12\x1a.theoros.v1.CommandRequest\x1a\x1b.theoros.v1.CommandResponse\x12H\n" +
-	"\x0fInteractiveExec\x12\x17.theoros.v1.ExecRequest\x1a\x18.theoros.v1.ExecResponse(\x010\x01\x12T\n" +
+	"\x0eExecuteCommand\x12\x1a.theoros.v1.CommandRequest\x1a\x1b.theoros.v1.CommandResponse\x12F\n" +
+	"\x0fInteractiveExec\x12\x17.theoros.v1.ExecRequest\x1a\x18.theoros.v1.ExecResponse0\x01\x12T\n" +
 	"\rGenerateToken\x12 .theoros.v1.GenerateTokenRequest\x1a!.theoros.v1.GenerateTokenResponse\x12H\n" +
 	"\tListUsers\x12\x1c.theoros.v1.ListUsersRequest\x1a\x1d.theoros.v1.ListUsersResponse\x12K\n" +
 	"\n" +

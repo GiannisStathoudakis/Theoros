@@ -59,7 +59,7 @@ const (
 type KubernetesServiceClient interface {
 	Login(context.Context, *connect.Request[v1.LoginRequest]) (*connect.Response[v1.LoginResponse], error)
 	ExecuteCommand(context.Context, *connect.Request[v1.CommandRequest]) (*connect.Response[v1.CommandResponse], error)
-	InteractiveExec(context.Context) *connect.BidiStreamForClient[v1.ExecRequest, v1.ExecResponse]
+	InteractiveExec(context.Context, *connect.Request[v1.ExecRequest]) (*connect.ServerStreamForClient[v1.ExecResponse], error)
 	// User Management
 	GenerateToken(context.Context, *connect.Request[v1.GenerateTokenRequest]) (*connect.Response[v1.GenerateTokenResponse], error)
 	ListUsers(context.Context, *connect.Request[v1.ListUsersRequest]) (*connect.Response[v1.ListUsersResponse], error)
@@ -146,8 +146,8 @@ func (c *kubernetesServiceClient) ExecuteCommand(ctx context.Context, req *conne
 }
 
 // InteractiveExec calls theoros.v1.KubernetesService.InteractiveExec.
-func (c *kubernetesServiceClient) InteractiveExec(ctx context.Context) *connect.BidiStreamForClient[v1.ExecRequest, v1.ExecResponse] {
-	return c.interactiveExec.CallBidiStream(ctx)
+func (c *kubernetesServiceClient) InteractiveExec(ctx context.Context, req *connect.Request[v1.ExecRequest]) (*connect.ServerStreamForClient[v1.ExecResponse], error) {
+	return c.interactiveExec.CallServerStream(ctx, req)
 }
 
 // GenerateToken calls theoros.v1.KubernetesService.GenerateToken.
@@ -174,7 +174,7 @@ func (c *kubernetesServiceClient) GetCompletions(ctx context.Context, req *conne
 type KubernetesServiceHandler interface {
 	Login(context.Context, *connect.Request[v1.LoginRequest]) (*connect.Response[v1.LoginResponse], error)
 	ExecuteCommand(context.Context, *connect.Request[v1.CommandRequest]) (*connect.Response[v1.CommandResponse], error)
-	InteractiveExec(context.Context, *connect.BidiStream[v1.ExecRequest, v1.ExecResponse]) error
+	InteractiveExec(context.Context, *connect.Request[v1.ExecRequest], *connect.ServerStream[v1.ExecResponse]) error
 	// User Management
 	GenerateToken(context.Context, *connect.Request[v1.GenerateTokenRequest]) (*connect.Response[v1.GenerateTokenResponse], error)
 	ListUsers(context.Context, *connect.Request[v1.ListUsersRequest]) (*connect.Response[v1.ListUsersResponse], error)
@@ -202,7 +202,7 @@ func NewKubernetesServiceHandler(svc KubernetesServiceHandler, opts ...connect.H
 		connect.WithSchema(kubernetesServiceMethods.ByName("ExecuteCommand")),
 		connect.WithHandlerOptions(opts...),
 	)
-	kubernetesServiceInteractiveExecHandler := connect.NewBidiStreamHandler(
+	kubernetesServiceInteractiveExecHandler := connect.NewServerStreamHandler(
 		KubernetesServiceInteractiveExecProcedure,
 		svc.InteractiveExec,
 		connect.WithSchema(kubernetesServiceMethods.ByName("InteractiveExec")),
@@ -265,7 +265,7 @@ func (UnimplementedKubernetesServiceHandler) ExecuteCommand(context.Context, *co
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("theoros.v1.KubernetesService.ExecuteCommand is not implemented"))
 }
 
-func (UnimplementedKubernetesServiceHandler) InteractiveExec(context.Context, *connect.BidiStream[v1.ExecRequest, v1.ExecResponse]) error {
+func (UnimplementedKubernetesServiceHandler) InteractiveExec(context.Context, *connect.Request[v1.ExecRequest], *connect.ServerStream[v1.ExecResponse]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("theoros.v1.KubernetesService.InteractiveExec is not implemented"))
 }
 
