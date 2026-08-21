@@ -23,8 +23,7 @@ const (
 
 type LoginRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
-	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
+	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -59,16 +58,9 @@ func (*LoginRequest) Descriptor() ([]byte, []int) {
 	return file_proto_theoros_v1_api_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *LoginRequest) GetUsername() string {
+func (x *LoginRequest) GetToken() string {
 	if x != nil {
-		return x.Username
-	}
-	return ""
-}
-
-func (x *LoginRequest) GetPassword() string {
-	if x != nil {
-		return x.Password
+		return x.Token
 	}
 	return ""
 }
@@ -611,10 +603,9 @@ var File_proto_theoros_v1_api_proto protoreflect.FileDescriptor
 const file_proto_theoros_v1_api_proto_rawDesc = "" +
 	"\n" +
 	"\x1aproto/theoros/v1/api.proto\x12\n" +
-	"theoros.v1\"F\n" +
-	"\fLoginRequest\x12\x1a\n" +
-	"\busername\x18\x01 \x01(\tR\busername\x12\x1a\n" +
-	"\bpassword\x18\x02 \x01(\tR\bpassword\"%\n" +
+	"theoros.v1\"$\n" +
+	"\fLoginRequest\x12\x14\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\"%\n" +
 	"\rLoginResponse\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\"\x8c\x01\n" +
 	"\x0eCommandRequest\x12\x16\n" +
