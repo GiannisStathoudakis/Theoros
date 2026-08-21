@@ -306,7 +306,10 @@ func (w *serverStreamWriter) Write(p []byte) (n int, err error) {
 		resp.Stdout = p
 	}
 	err = w.stream.Send(resp)
-	return len(p), err
+	if err != nil {
+		return 0, err
+	}
+	return len(p), nil
 }
 
 func (s *TheorosServer) InteractiveExec(
@@ -355,8 +358,9 @@ func (s *TheorosServer) InteractiveExec(
 		}
 	}()
 
-	err := kubectlCmd.Execute()
-	if err != nil {
+	err := kubectlCmd.ExecuteContext(ctx)
+
+	if err != nil && !errors.Is(err, context.Canceled) {
 		return connect.NewError(connect.CodeUnknown, err)
 	}
 
