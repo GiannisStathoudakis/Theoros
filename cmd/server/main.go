@@ -17,6 +17,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
+	cmdutil "k8s.io/kubectl/pkg/cmd/util"
 	_ "modernc.org/sqlite" // SQLite Driver
 
 	// Kubernetes client-go
@@ -34,6 +35,12 @@ import (
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/kubectl/pkg/cmd"
 )
+
+func init() {
+	cmdutil.BehaviorOnFatal(func(msg string, code int) {
+		panic(msg)
+	})
+}
 
 type TheorosServer struct {
 	secretKey []byte
@@ -207,7 +214,13 @@ func (s *TheorosServer) Login(
 func (s *TheorosServer) ExecuteCommand(
 	ctx context.Context,
 	req *connect.Request[pb.CommandRequest],
-) (*connect.Response[pb.CommandResponse], error) {
+) (res *connect.Response[pb.CommandResponse], err error) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			err = connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%v", r))
+		}
+	}()
 
 	log.Printf("[Audit] Executing: %s %s (namespace: '%s', flags: %v)",
 		req.Msg.Action, req.Msg.Resource, req.Msg.Namespace, req.Msg.Flags)
@@ -464,7 +477,13 @@ func (s *TheorosServer) DeleteUser(
 func (s *TheorosServer) GetCompletions(
 	ctx context.Context,
 	req *connect.Request[pb.GetCompletionsRequest],
-) (*connect.Response[pb.GetCompletionsResponse], error) {
+) (res *connect.Response[pb.GetCompletionsResponse], err error) {
+
+	defer func() {
+		if r := recover(); r != nil {
+			err = connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("%v", r))
+		}
+	}()
 
 	// Prepare the hidden __complete command
 	cmdArgs := append([]string{"__complete"}, req.Msg.Args...)
