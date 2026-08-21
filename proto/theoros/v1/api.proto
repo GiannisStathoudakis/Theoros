@@ -8,9 +8,16 @@ service KubernetesService {
   rpc Login(LoginRequest) returns (LoginResponse);
   rpc ExecuteCommand(CommandRequest) returns (CommandResponse);
   rpc InteractiveExec(stream ExecRequest) returns (stream ExecResponse);
+  
+  // User Management
+  rpc GenerateToken(GenerateTokenRequest) returns (GenerateTokenResponse);
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
 }
 
 message LoginRequest {
+  string username = 1;
+  string password = 2;
 }
 
 message LoginResponse {
@@ -38,4 +45,27 @@ message ExecRequest {
 message ExecResponse {
   bytes stdout_data = 1;
   bytes stderr_data = 2;
+}
+
+// User Management Messages
+message GenerateTokenRequest {
+  string username = 1;
+}
+
+message GenerateTokenResponse {
+  string token = 1;
+}
+
+message ListUsersRequest {}
+
+message ListUsersResponse {
+  repeated string usernames = 1;
+}
+
+message DeleteUserRequest {
+  string username = 1;
+}
+
+message DeleteUserResponse {
+  string message = 1;
 }

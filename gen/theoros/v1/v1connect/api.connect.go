@@ -41,6 +41,15 @@ const (
 	// KubernetesServiceInteractiveExecProcedure is the fully-qualified name of the KubernetesService's
 	// InteractiveExec RPC.
 	KubernetesServiceInteractiveExecProcedure = "/theoros.v1.KubernetesService/InteractiveExec"
+	// KubernetesServiceGenerateTokenProcedure is the fully-qualified name of the KubernetesService's
+	// GenerateToken RPC.
+	KubernetesServiceGenerateTokenProcedure = "/theoros.v1.KubernetesService/GenerateToken"
+	// KubernetesServiceListUsersProcedure is the fully-qualified name of the KubernetesService's
+	// ListUsers RPC.
+	KubernetesServiceListUsersProcedure = "/theoros.v1.KubernetesService/ListUsers"
+	// KubernetesServiceDeleteUserProcedure is the fully-qualified name of the KubernetesService's
+	// DeleteUser RPC.
+	KubernetesServiceDeleteUserProcedure = "/theoros.v1.KubernetesService/DeleteUser"
 )
 
 // KubernetesServiceClient is a client for the theoros.v1.KubernetesService service.
@@ -48,6 +57,10 @@ type KubernetesServiceClient interface {
 	Login(context.Context, *connect.Request[v1.LoginRequest]) (*connect.Response[v1.LoginResponse], error)
 	ExecuteCommand(context.Context, *connect.Request[v1.CommandRequest]) (*connect.Response[v1.CommandResponse], error)
 	InteractiveExec(context.Context) *connect.BidiStreamForClient[v1.ExecRequest, v1.ExecResponse]
+	// User Management
+	GenerateToken(context.Context, *connect.Request[v1.GenerateTokenRequest]) (*connect.Response[v1.GenerateTokenResponse], error)
+	ListUsers(context.Context, *connect.Request[v1.ListUsersRequest]) (*connect.Response[v1.ListUsersResponse], error)
+	DeleteUser(context.Context, *connect.Request[v1.DeleteUserRequest]) (*connect.Response[v1.DeleteUserResponse], error)
 }
 
 // NewKubernetesServiceClient constructs a client for the theoros.v1.KubernetesService service. By
@@ -79,6 +92,24 @@ func NewKubernetesServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(kubernetesServiceMethods.ByName("InteractiveExec")),
 			connect.WithClientOptions(opts...),
 		),
+		generateToken: connect.NewClient[v1.GenerateTokenRequest, v1.GenerateTokenResponse](
+			httpClient,
+			baseURL+KubernetesServiceGenerateTokenProcedure,
+			connect.WithSchema(kubernetesServiceMethods.ByName("GenerateToken")),
+			connect.WithClientOptions(opts...),
+		),
+		listUsers: connect.NewClient[v1.ListUsersRequest, v1.ListUsersResponse](
+			httpClient,
+			baseURL+KubernetesServiceListUsersProcedure,
+			connect.WithSchema(kubernetesServiceMethods.ByName("ListUsers")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteUser: connect.NewClient[v1.DeleteUserRequest, v1.DeleteUserResponse](
+			httpClient,
+			baseURL+KubernetesServiceDeleteUserProcedure,
+			connect.WithSchema(kubernetesServiceMethods.ByName("DeleteUser")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -87,6 +118,9 @@ type kubernetesServiceClient struct {
 	login           *connect.Client[v1.LoginRequest, v1.LoginResponse]
 	executeCommand  *connect.Client[v1.CommandRequest, v1.CommandResponse]
 	interactiveExec *connect.Client[v1.ExecRequest, v1.ExecResponse]
+	generateToken   *connect.Client[v1.GenerateTokenRequest, v1.GenerateTokenResponse]
+	listUsers       *connect.Client[v1.ListUsersRequest, v1.ListUsersResponse]
+	deleteUser      *connect.Client[v1.DeleteUserRequest, v1.DeleteUserResponse]
 }
 
 // Login calls theoros.v1.KubernetesService.Login.
@@ -104,11 +138,30 @@ func (c *kubernetesServiceClient) InteractiveExec(ctx context.Context) *connect.
 	return c.interactiveExec.CallBidiStream(ctx)
 }
 
+// GenerateToken calls theoros.v1.KubernetesService.GenerateToken.
+func (c *kubernetesServiceClient) GenerateToken(ctx context.Context, req *connect.Request[v1.GenerateTokenRequest]) (*connect.Response[v1.GenerateTokenResponse], error) {
+	return c.generateToken.CallUnary(ctx, req)
+}
+
+// ListUsers calls theoros.v1.KubernetesService.ListUsers.
+func (c *kubernetesServiceClient) ListUsers(ctx context.Context, req *connect.Request[v1.ListUsersRequest]) (*connect.Response[v1.ListUsersResponse], error) {
+	return c.listUsers.CallUnary(ctx, req)
+}
+
+// DeleteUser calls theoros.v1.KubernetesService.DeleteUser.
+func (c *kubernetesServiceClient) DeleteUser(ctx context.Context, req *connect.Request[v1.DeleteUserRequest]) (*connect.Response[v1.DeleteUserResponse], error) {
+	return c.deleteUser.CallUnary(ctx, req)
+}
+
 // KubernetesServiceHandler is an implementation of the theoros.v1.KubernetesService service.
 type KubernetesServiceHandler interface {
 	Login(context.Context, *connect.Request[v1.LoginRequest]) (*connect.Response[v1.LoginResponse], error)
 	ExecuteCommand(context.Context, *connect.Request[v1.CommandRequest]) (*connect.Response[v1.CommandResponse], error)
 	InteractiveExec(context.Context, *connect.BidiStream[v1.ExecRequest, v1.ExecResponse]) error
+	// User Management
+	GenerateToken(context.Context, *connect.Request[v1.GenerateTokenRequest]) (*connect.Response[v1.GenerateTokenResponse], error)
+	ListUsers(context.Context, *connect.Request[v1.ListUsersRequest]) (*connect.Response[v1.ListUsersResponse], error)
+	DeleteUser(context.Context, *connect.Request[v1.DeleteUserRequest]) (*connect.Response[v1.DeleteUserResponse], error)
 }
 
 // NewKubernetesServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -136,6 +189,24 @@ func NewKubernetesServiceHandler(svc KubernetesServiceHandler, opts ...connect.H
 		connect.WithSchema(kubernetesServiceMethods.ByName("InteractiveExec")),
 		connect.WithHandlerOptions(opts...),
 	)
+	kubernetesServiceGenerateTokenHandler := connect.NewUnaryHandler(
+		KubernetesServiceGenerateTokenProcedure,
+		svc.GenerateToken,
+		connect.WithSchema(kubernetesServiceMethods.ByName("GenerateToken")),
+		connect.WithHandlerOptions(opts...),
+	)
+	kubernetesServiceListUsersHandler := connect.NewUnaryHandler(
+		KubernetesServiceListUsersProcedure,
+		svc.ListUsers,
+		connect.WithSchema(kubernetesServiceMethods.ByName("ListUsers")),
+		connect.WithHandlerOptions(opts...),
+	)
+	kubernetesServiceDeleteUserHandler := connect.NewUnaryHandler(
+		KubernetesServiceDeleteUserProcedure,
+		svc.DeleteUser,
+		connect.WithSchema(kubernetesServiceMethods.ByName("DeleteUser")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/theoros.v1.KubernetesService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case KubernetesServiceLoginProcedure:
@@ -144,6 +215,12 @@ func NewKubernetesServiceHandler(svc KubernetesServiceHandler, opts ...connect.H
 			kubernetesServiceExecuteCommandHandler.ServeHTTP(w, r)
 		case KubernetesServiceInteractiveExecProcedure:
 			kubernetesServiceInteractiveExecHandler.ServeHTTP(w, r)
+		case KubernetesServiceGenerateTokenProcedure:
+			kubernetesServiceGenerateTokenHandler.ServeHTTP(w, r)
+		case KubernetesServiceListUsersProcedure:
+			kubernetesServiceListUsersHandler.ServeHTTP(w, r)
+		case KubernetesServiceDeleteUserProcedure:
+			kubernetesServiceDeleteUserHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -163,4 +240,16 @@ func (UnimplementedKubernetesServiceHandler) ExecuteCommand(context.Context, *co
 
 func (UnimplementedKubernetesServiceHandler) InteractiveExec(context.Context, *connect.BidiStream[v1.ExecRequest, v1.ExecResponse]) error {
 	return connect.NewError(connect.CodeUnimplemented, errors.New("theoros.v1.KubernetesService.InteractiveExec is not implemented"))
+}
+
+func (UnimplementedKubernetesServiceHandler) GenerateToken(context.Context, *connect.Request[v1.GenerateTokenRequest]) (*connect.Response[v1.GenerateTokenResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("theoros.v1.KubernetesService.GenerateToken is not implemented"))
+}
+
+func (UnimplementedKubernetesServiceHandler) ListUsers(context.Context, *connect.Request[v1.ListUsersRequest]) (*connect.Response[v1.ListUsersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("theoros.v1.KubernetesService.ListUsers is not implemented"))
+}
+
+func (UnimplementedKubernetesServiceHandler) DeleteUser(context.Context, *connect.Request[v1.DeleteUserRequest]) (*connect.Response[v1.DeleteUserResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("theoros.v1.KubernetesService.DeleteUser is not implemented"))
 }
