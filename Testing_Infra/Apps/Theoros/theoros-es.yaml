@@ -1,7 +1,7 @@
 apiVersion: external-secrets.io/v1 
 kind: ExternalSecret
 metadata:
-  name: theoros-jwt-token
+  name: theoros-cred-token
   namespace: theoros
 spec:
   refreshInterval: "1h"
@@ -9,10 +9,18 @@ spec:
     name: vault-backend
     kind: ClusterSecretStore
   target:
-    name: theoros-jwt
+    name: theoros-cred
     creationPolicy: Owner
+    template:
+      engineVersion: v2
+      data:
+        credentials: "{{ .username }}:{{ .password }}"
   data:
-    - secretKey: jwt.key
+    - secretKey: username
       remoteRef:
         key: Theoros
-        property: token
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: Theoros
+        property: password
