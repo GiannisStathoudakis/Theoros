@@ -334,13 +334,13 @@ func (s *TheorosServer) WebSocketHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	log.Printf("[Audit-WS] Starting Interactive Exec: %s %s (namespace: '%s')", req.Action, req.Resource, req.Namespace)
+	log.Printf("[Audit-WS] Starting Interactive Exec: %s (namespace: '%s')", req.Action, req.Namespace)
 
 	// Clean flags to prevent kubectl from complaining about fake TTY
 	cleanFlags := []string{}
 	for _, f := range req.Flags {
 		if f == "-it" || f == "-ti" {
-			cleanFlags = append(cleanFlags, "-i")
+			cleanFlags = append(cleanFlags, "-i") // Strip the T, keep the I
 		} else if f != "-t" && f != "--tty" {
 			cleanFlags = append(cleanFlags, f)
 		}
@@ -384,6 +384,13 @@ func (s *TheorosServer) WebSocketHandler(w http.ResponseWriter, r *http.Request)
 	})
 	kubectlCmd.SetArgs(args)
 	kubectlCmd.SilenceUsage, kubectlCmd.SilenceErrors = true, true
+
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[Audit-WS] Recovered from panic: %v", r)
+			ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("\r\n❌ Session terminated: %v\r\n", r)))
+		}
+	}()
 
 	_ = kubectlCmd.Execute()
 	log.Printf("[Audit-WS] Interactive session closed cleanly.")
