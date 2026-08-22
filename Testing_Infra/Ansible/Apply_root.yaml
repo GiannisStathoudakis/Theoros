@@ -1,7 +1,0 @@
----
-- hosts: master
-  tasks:
-    - name: 01. Apply Application
-      kubernetes.core.k8s:
-        state: present
-        src: "https://raw.githubusercontent.com/GiannisStathoudakis/Theoros/master/Testing_Infra/Bootstrap/root.yaml?v=3"
