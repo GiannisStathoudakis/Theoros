@@ -1,4 +1,4 @@
-name: Pipeline 
+name: Production Release 
 
 on:
   push:
@@ -55,8 +55,6 @@ jobs:
           images: ghcr.io/${{ github.repository }}-server
           tags: |
             type=semver,pattern={{version}},prefix=prod-v
-            type=ref,event=branch
-            type=sha,prefix=sha-
 
       - name: Push Docker Image to GHCR
         uses: docker/build-push-action@v5
@@ -74,13 +72,11 @@ jobs:
       # HELM CHART STAGE
       # -------------------------------------------------------------
       - name: Install Helm
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: azure/setup-helm@v5
         with:
           version: latest
 
       - name: Package and Push Helm Chart to GHCR
-        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
           helm package ./chart
