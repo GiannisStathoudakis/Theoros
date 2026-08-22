@@ -10,7 +10,7 @@ subjects:
   name: {{ include "theoros.serviceAccountName" . }}
   namespace: {{ .Release.Namespace }}
 roleRef:
-  kind: ClusterRole
-  name: {{ include "theoros.fullname" . }}-role
   apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
 {{- end }}
