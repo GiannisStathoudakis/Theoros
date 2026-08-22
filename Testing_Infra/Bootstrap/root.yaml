@@ -29,7 +29,7 @@ spec:
       project: default
       source:
         repoURL: git@github.com:GiannisStathoudakis/Theoros.git
-        targetRevision: HEAD
+        targetRevision: master
         path: 'Testing_Infra/{{path}}'
       destination:
         server: https://kubernetes.default.svc
