@@ -98,6 +98,7 @@ go build -o theoros ./cmd/client/main.go
 # Run it!
 ./theoros    # On Linux/macOS
 theoros.exe  # On Windows
+```
 
 ---
 
