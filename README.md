@@ -60,7 +60,7 @@ Once connected as an administrator, you can manage team access directly from the
 
 **Add a new user:**
 ```bash
-> user add john.doe
+> user generate john.doe
 User 'john.doe' created successfully.
 Auth Token: th_token_abc123def456...  # Share this securely with the user
 ```
