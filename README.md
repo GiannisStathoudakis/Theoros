@@ -81,6 +81,26 @@ User 'john.doe' has been successfully removed.
 
 ---
 
+## Installation (Client)
+
+The Theoros client is fully cross-platform (Windows, macOS, and Linux). 
+
+If you have Go installed on your machine, you can build the client directly from source:
+
+```bash
+# Clone the repository
+git clone https://github.com/GiannisStathoudakis/Theoros.git
+cd Theoros
+
+# Build the client
+go build -o theoros ./cmd/client/main.go
+
+# Run it!
+./theoros    # On Linux/macOS
+theoros.exe  # On Windows
+
+---
+
 ## 🚀 Roadmap
 
 While secure `kubectl` remote execution is fully functional today, Theoros is actively expanding into a complete observability command center. Planned data source integrations include:
