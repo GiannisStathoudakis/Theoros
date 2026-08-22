@@ -1,6 +1,0 @@
-apiVersion: v2
-name: theoros
-description: A Helm chart for the Theoros secure Kubernetes CLI proxy
-type: application
-version: 1.0.0
-appVersion: "v1.0.0"
