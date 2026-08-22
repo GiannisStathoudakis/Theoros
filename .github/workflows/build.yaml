@@ -3,7 +3,6 @@ name: Pipeline
 on:
   push:
     branches:
-      - master
       - main
     tags:
       - 'v*'
