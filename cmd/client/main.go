@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
@@ -101,8 +100,8 @@ func loadConfig(password string) (Config, error) {
 // CLI HELPERS
 // ==========================================
 func clearScreen() { fmt.Print("\033[H\033[2J") }
-func getPassword(prompt string) string {
-	fmt.Print(prompt)
+func getPassword(promptMsg string) string {
+	fmt.Print(promptMsg)
 	bytepw, _ := term.ReadPassword(int(os.Stdin.Fd()))
 	fmt.Println()
 	return string(bytepw)
@@ -114,6 +113,10 @@ func sanitizeInput(in string) string {
 		}
 		return -1
 	}, in)
+}
+
+func emptyCompleter(d prompt.Document) []prompt.Suggest {
+	return nil
 }
 
 // ==========================================
@@ -148,7 +151,6 @@ func main() {
 		}
 	}
 
-	reader := bufio.NewReader(os.Stdin)
 	var feedbackMsg string
 
 	// Vault Selection Menu
@@ -164,9 +166,8 @@ func main() {
 		for i, conn := range cfg.Connections {
 			fmt.Printf("[%d] %s\n", i+1, conn.URL)
 		}
-		fmt.Print("\n> ")
 
-		rawInput, _ := reader.ReadString('\n')
+		rawInput := prompt.Input("> ", emptyCompleter)
 		input := strings.TrimSpace(rawInput)
 
 		if input == "" {
@@ -195,8 +196,7 @@ func main() {
 
 		// Add New Connection
 		if input == "0" {
-			fmt.Print("Enter Cluster URL (e.g., theoros.site.com): ")
-			rawURL, _ := reader.ReadString('\n')
+			rawURL := prompt.Input("Enter Cluster URL (e.g., theoros.site.com): ", emptyCompleter)
 			baseURL := strings.TrimSpace(rawURL)
 
 			if baseURL == "" {
@@ -210,7 +210,6 @@ func main() {
 
 			fmt.Print("Probing server... ")
 
-			// 2. Create a temporary "probe" client (ignores cert errors just to see if the port is open)
 			probeClient := &http.Client{
 				Timeout: 3 * time.Second,
 				Transport: &http.Transport{
@@ -221,11 +220,9 @@ func main() {
 			finalURL := baseURL
 			isHTTPS := strings.HasPrefix(baseURL, "https://")
 
-			// 3. Send a quick test request
 			resp, err := probeClient.Get(baseURL)
 
 			if err != nil && isHTTPS {
-				// HTTPS failed (e.g., connection refused). Fallback to HTTP test!
 				httpURL := strings.Replace(baseURL, "https://", "http://", 1)
 				respHTTP, errHTTP := probeClient.Get(httpURL)
 
@@ -252,16 +249,15 @@ func main() {
 				continue
 			}
 
-			// 4. Only ask about self-signed certs if we are actually using HTTPS!
+			// Only ask about self-signed certs if HTTPS is used
 			insecure := false
 			if isHTTPS {
-				fmt.Print("Is the certificate self-signed? (y/n): ")
-				rawCert, _ := reader.ReadString('\n')
+				rawCert := prompt.Input("Is the certificate self-signed? (y/n): ", emptyCompleter)
 				certInput := strings.ToLower(strings.TrimSpace(rawCert))
 				insecure = certInput == "y" || certInput == "yes"
 			}
 
-			// 5. Get API Key and Login
+			// Get API Key and Login
 			newKey := strings.TrimSpace(getPassword("Enter API Key: "))
 
 			customHttpClient := &http.Client{
@@ -431,7 +427,7 @@ func startInteractiveSession(conn Connection) error {
 		var flags []string
 		if len(parts) > 1 {
 			flags = parts[1:]
-		} // Pass everything after action to flags for robust parsing
+		}
 
 		isInteractive, isStreaming := false, false
 		if action == "exec" {
@@ -448,10 +444,10 @@ func startInteractiveSession(conn Connection) error {
 		}
 
 		if isInteractive {
-			// ROUTE A: WebSockets (Interactive TTY Shell)
+			// ROUTE A: WebSockets
 			if stateErr == nil {
 				term.Restore(fd, healthyState)
-			} // Yield keyboard to OS
+			}
 
 			wsURL := strings.Replace(conn.URL, "http", "ws", 1) + "/ws/exec?token=" + sessionToken
 
@@ -474,7 +470,7 @@ func startInteractiveSession(conn Connection) error {
 			reqBytes, _ := json.Marshal(cmdReq)
 			ws.WriteMessage(websocket.TextMessage, reqBytes)
 
-			go func() { // Keyboard -> Server
+			go func() {
 				buf := make([]byte, 1024)
 				for {
 					n, err := os.Stdin.Read(buf)
@@ -487,7 +483,7 @@ func startInteractiveSession(conn Connection) error {
 				}
 			}()
 
-			for { // Server -> Screen
+			for {
 				_, msg, err := ws.ReadMessage()
 				if err != nil {
 					break
@@ -504,7 +500,7 @@ func startInteractiveSession(conn Connection) error {
 			// ROUTE B: Server-Side Streams (Logs -f, Get -w)
 			if stateErr == nil {
 				term.Restore(fd, healthyState)
-			} // Yield keyboard for Ctrl+C
+			}
 
 			streamCtx, cancelStream := context.WithCancel(context.Background())
 			sigCh := make(chan os.Signal, 1)
