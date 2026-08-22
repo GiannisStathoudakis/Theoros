@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: Pipeline
 
 on:
   push:
@@ -87,4 +87,5 @@ jobs:
         run: |
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
           helm package ./chart
-          helm push theoros-*.tgz oci://ghcr.io/${{ github.repository_owner }}
+          LOWERCASE_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          helm push theoros-*.tgz oci://ghcr.io/$LOWERCASE_OWNER
