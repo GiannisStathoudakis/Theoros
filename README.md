@@ -3,7 +3,7 @@
 ## What is Theoros?
 **Theoros** is a zero-trust, interactive terminal and remote-execution agent for Kubernetes.
 
-Distributing highly-privileged `kubeconfig` files to hosts presents significant security challenges. Theoros is designed to eliminate this risk. The agent executes commands on behalf of the user and streams the results back to the terminal. This architecture removes the need for local `kubeconfig` files or complex VPN setups, providing clean, zero-trust access to the cluster.
+Distributing highly-privileged `kubeconfig` files to hosts presents significant security challenges. Theoros is designed to eliminate this risk. The agent executes commands on behalf of the user and streams the results back to the terminal. This architecture removes the need for local `kubeconfig` files, providing clean, zero-trust access to the cluster.
 
 Built entirely with security in mind, Theoros operates on a strict split architecture between a local client and an in-cluster agent.
 
@@ -46,8 +46,10 @@ stringData:
 ### 2. Deploy the Server
 Use the provided Helm chart to deploy the lightweight Go pod into your cluster.
 
-### 3. Route Traffic
-Expose the server using your preferred Ingress controller or Gateway API to handle SSL termination.
+### 3. Route Traffic & Security Best Practices
+Expose the server using your preferred Ingress controller or Gateway API to handle SSL termination. 
+
+**Security Recommendation:** Because Theoros provides direct remote-execution access to your cluster, we highly recommend exposing the server's ingress or gateway api route **only to internal private networks or behind a VPN** (such as WireGuard, Tailscale, or an enterprise VPN). Do not expose the endpoint to the public internet to prevent unauthorized scanning by bad actors.
 
 ### 4. Connect the Client
 Add the cluster's routing URL and your credentials to the local Theoros client, and begin securely executing commands.
@@ -108,3 +110,9 @@ While secure `kubectl` remote execution is fully functional today, Theoros is ac
 
 * **Log Streaming:** Native integration with **Grafana Loki** and **VictoriaLogs** to securely view, filter, and stream cluster logs directly within the terminal.
 * **Metrics Querying:** Direct integration with **Prometheus** (and similar metric backends) to query cluster health, monitor application builds, and view resource usage without leaving the command line.
+
+---
+
+## License
+
+This project is open-source and licensed under the [MIT License](LICENSE).
