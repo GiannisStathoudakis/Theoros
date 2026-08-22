@@ -49,7 +49,7 @@ Use the provided Helm chart to deploy the lightweight Go pod into your cluster.
 ### 3. Route Traffic & Security Best Practices
 Expose the server using your preferred Ingress controller or Gateway API to handle SSL termination. 
 
-**Security Recommendation:** Because Theoros provides direct remote-execution access to your cluster, we highly recommend exposing the server's ingress or gateway api route **only to internal private networks or behind a VPN** (such as WireGuard, Tailscale, or an enterprise VPN). Do not expose the endpoint to the public internet to prevent unauthorized scanning by bad actors.
+**Security Recommendation:** Because Theoros provides direct remote-execution access to your cluster, we highly recommend exposing the server's ingress or gateway api route **only to internal private networks or behind a VPN**. Do not expose the endpoint to the public internet to prevent unauthorized scanning by bad actors.
 
 ### 4. Connect the Client
 Add the cluster's routing URL and your credentials to the local Theoros client, and begin securely executing commands.
