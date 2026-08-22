@@ -7,6 +7,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -33,7 +34,11 @@ import (
 type Config struct {
 	Connections []Connection `json:"connections"`
 }
-type Connection struct{ URL, Key string }
+type Connection struct {
+	URL      string
+	Key      string
+	Insecure bool
+}
 
 var configPath string
 
@@ -127,7 +132,7 @@ func main() {
 				masterPassword = pass1
 				break
 			}
-			fmt.Println("❌ Passwords do not match or are empty.")
+			fmt.Println("Passwords do not match or are empty.")
 		}
 		cfg = Config{Connections: []Connection{}}
 		saveConfig(cfg, masterPassword)
@@ -139,7 +144,7 @@ func main() {
 				cfg = loadedCfg
 				break
 			}
-			fmt.Println("❌ Incorrect password or corrupted file.")
+			fmt.Println("Incorrect password or corrupted file.")
 		}
 	}
 
@@ -149,9 +154,9 @@ func main() {
 	// Vault Selection Menu
 	for {
 		clearScreen()
-		fmt.Println("=======================================\n         Theoros Client Vault          \n=======================================")
+		fmt.Println("=======================================\n           Theoros Client Vault          \n=======================================")
 		if feedbackMsg != "" {
-			fmt.Printf("⚠️  %s\n---------------------------------------\n", feedbackMsg)
+			fmt.Printf("%s\n---------------------------------------\n", feedbackMsg)
 			feedbackMsg = ""
 		}
 
@@ -190,15 +195,89 @@ func main() {
 
 		// Add New Connection
 		if input == "0" {
-			fmt.Print("Enter Cluster URL: ")
-			newURL := strings.TrimSpace(getPassword("")) // Suppresses terminal echo for cleaner UI
-			newKey := strings.TrimSpace(getPassword("Enter API Key: "))
-			client := v1connect.NewKubernetesServiceClient(http.DefaultClient, newURL)
-			if _, err := client.Login(context.Background(), connect.NewRequest(&pb.LoginRequest{Token: newKey})); err == nil {
-				cfg.Connections = append(cfg.Connections, Connection{URL: newURL, Key: newKey})
-				saveConfig(cfg, masterPassword)
+			fmt.Print("Enter Cluster URL (e.g., theoros.site.com): ")
+			rawURL, _ := reader.ReadString('\n')
+			baseURL := strings.TrimSpace(rawURL)
+
+			if baseURL == "" {
+				continue
+			}
+
+			// 1. Auto-prefix with https:// if no prefix is given
+			if !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
+				baseURL = "https://" + baseURL
+			}
+
+			fmt.Print("Probing server... ")
+
+			// 2. Create a temporary "probe" client (ignores cert errors just to see if the port is open)
+			probeClient := &http.Client{
+				Timeout: 3 * time.Second,
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				},
+			}
+
+			finalURL := baseURL
+			isHTTPS := strings.HasPrefix(baseURL, "https://")
+
+			// 3. Send a quick test request
+			resp, err := probeClient.Get(baseURL)
+
+			if err != nil && isHTTPS {
+				// HTTPS failed (e.g., connection refused). Fallback to HTTP test!
+				httpURL := strings.Replace(baseURL, "https://", "http://", 1)
+				respHTTP, errHTTP := probeClient.Get(httpURL)
+
+				if errHTTP == nil {
+					finalURL = httpURL
+					isHTTPS = false
+					fmt.Println("Detected HTTP.")
+					if respHTTP != nil {
+						respHTTP.Body.Close()
+					}
+				} else {
+					fmt.Println("Failed (Could not reach server on HTTPS or HTTP).")
+					time.Sleep(2 * time.Second)
+					continue
+				}
+			} else if err == nil {
+				fmt.Println("Detected HTTPS.")
+				if resp != nil {
+					resp.Body.Close()
+				}
 			} else {
-				feedbackMsg = "Authentication failed. Invalid URL or API Key."
+				fmt.Println("Failed (Could not reach server).")
+				time.Sleep(2 * time.Second)
+				continue
+			}
+
+			// 4. Only ask about self-signed certs if we are actually using HTTPS!
+			insecure := false
+			if isHTTPS {
+				fmt.Print("Is the certificate self-signed? (y/n): ")
+				rawCert, _ := reader.ReadString('\n')
+				certInput := strings.ToLower(strings.TrimSpace(rawCert))
+				insecure = certInput == "y" || certInput == "yes"
+			}
+
+			// 5. Get API Key and Login
+			newKey := strings.TrimSpace(getPassword("Enter API Key: "))
+
+			customHttpClient := &http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: insecure},
+				},
+			}
+
+			client := v1connect.NewKubernetesServiceClient(customHttpClient, finalURL)
+
+			if _, loginErr := client.Login(context.Background(), connect.NewRequest(&pb.LoginRequest{Token: newKey})); loginErr == nil {
+				cfg.Connections = append(cfg.Connections, Connection{URL: finalURL, Key: newKey, Insecure: insecure})
+				saveConfig(cfg, masterPassword)
+				feedbackMsg = "Connection added successfully!"
+			} else {
+				feedbackMsg = "Authentication failed. Invalid API Key."
 			}
 			continue
 		}
@@ -220,7 +299,13 @@ func main() {
 // INTERACTIVE SESSION ENGINE
 // ==========================================
 func startInteractiveSession(conn Connection) error {
-	client := v1connect.NewKubernetesServiceClient(http.DefaultClient, conn.URL)
+	customHttpClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: conn.Insecure},
+		},
+	}
+
+	client := v1connect.NewKubernetesServiceClient(customHttpClient, conn.URL)
 	loginResp, err := client.Login(context.Background(), connect.NewRequest(&pb.LoginRequest{Token: conn.Key}))
 	if err != nil {
 		return fmt.Errorf("authentication failed")
@@ -287,7 +372,7 @@ func startInteractiveSession(conn Connection) error {
 		// --- USER MANAGEMENT ROUTE ---
 		if action == "user" {
 			if len(parts) < 2 {
-				fmt.Println("❌ Usage: user [list | generate <username> | delete <username>]")
+				fmt.Println("Usage: user [list | generate <username> | delete <username>]")
 				return
 			}
 			for retryCount := 0; retryCount < 3; retryCount++ {
@@ -307,37 +392,37 @@ func startInteractiveSession(conn Connection) error {
 					}
 				case "generate":
 					if len(parts) != 3 {
-						fmt.Println("❌ Usage: user generate <username>")
+						fmt.Println("Usage: user generate <username>")
 						return
 					}
 					req := connect.NewRequest(&pb.GenerateTokenRequest{Username: parts[2]})
 					req.Header().Set("Authorization", "Bearer "+sessionToken)
 					var resp *connect.Response[pb.GenerateTokenResponse]
 					if resp, err = client.GenerateToken(context.Background(), req); err == nil {
-						fmt.Printf("✅ Token generated for '%s':\n🔑 %s\n⚠️  Copy this now!\n", parts[2], resp.Msg.Token)
+						fmt.Printf("Token generated for '%s':\n%s\nCopy this now!\n", parts[2], resp.Msg.Token)
 						return
 					}
 				case "delete":
 					if len(parts) != 3 {
-						fmt.Println("❌ Usage: user delete <username>")
+						fmt.Println("Usage: user delete <username>")
 						return
 					}
 					req := connect.NewRequest(&pb.DeleteUserRequest{Username: parts[2]})
 					req.Header().Set("Authorization", "Bearer "+sessionToken)
 					var resp *connect.Response[pb.DeleteUserResponse]
 					if resp, err = client.DeleteUser(context.Background(), req); err == nil {
-						fmt.Printf("✅ %s\n", resp.Msg.Message)
+						fmt.Printf("%s\n", resp.Msg.Message)
 						return
 					}
 				default:
-					fmt.Println("❌ Unknown user command.")
+					fmt.Println("Unknown user command.")
 					return
 				}
 				// Auto-retry on token expiration
 				if connect.CodeOf(err) == connect.CodeUnauthenticated && refreshSession() == nil {
 					continue
 				}
-				fmt.Printf("❌ Error: %v\n", err)
+				fmt.Printf("Error: %v\n", err)
 				return
 			}
 		}
@@ -369,9 +454,15 @@ func startInteractiveSession(conn Connection) error {
 			} // Yield keyboard to OS
 
 			wsURL := strings.Replace(conn.URL, "http", "ws", 1) + "/ws/exec?token=" + sessionToken
-			ws, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+
+			dialer := *websocket.DefaultDialer
+			if conn.Insecure {
+				dialer.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+			}
+
+			ws, _, err := dialer.Dial(wsURL, nil)
 			if err != nil {
-				fmt.Printf("\r\n❌ Failed to open interactive session: %v\r\n", err)
+				fmt.Printf("\r\nFailed to open interactive session: %v\r\n", err)
 				return
 			}
 
@@ -439,7 +530,7 @@ func startInteractiveSession(conn Connection) error {
 				}
 				stream.Close()
 			} else {
-				fmt.Printf("\n❌ Stream Error: %v\n", err)
+				fmt.Printf("\nStream Error: %v\n", err)
 			}
 
 			signal.Stop(sigCh)
@@ -456,13 +547,13 @@ func startInteractiveSession(conn Connection) error {
 					if connect.CodeOf(err) == connect.CodeUnauthenticated && refreshSession() == nil {
 						continue
 					}
-					fmt.Printf("❌ Error: %v\n", err)
+					fmt.Printf("Error: %v\n", err)
 					return
 				}
 				fmt.Print(resp.Msg.Output)
 				return
 			}
-			fmt.Println("❌ Session expired. Please log in again.")
+			fmt.Println("Session expired. Please log in again.")
 		}
 	}
 
