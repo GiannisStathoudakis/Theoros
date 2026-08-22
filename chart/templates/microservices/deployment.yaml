@@ -14,7 +14,7 @@ spec:
       labels:
         {{- include "theoros.selectorLabels" . | nindent 8 }}
     spec:
-      serviceAccountName: {{ include "theoros.serviceAccountName" . }}
+      serviceAccountName: {{ include "theoros.fullname" . }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
