@@ -285,7 +285,7 @@ func main() {
 			continue
 		}
 
-		if err = startInteractiveSession(cfg.Connections[idx-1]); err != nil {
+		if err = startInteractiveSession(cfg.Connections[idx-1], &cfg, masterPassword); err != nil {
 			feedbackMsg = err.Error()
 		}
 	}
@@ -294,7 +294,7 @@ func main() {
 // ==========================================
 // INTERACTIVE SESSION ENGINE
 // ==========================================
-func startInteractiveSession(conn Connection) error {
+func startInteractiveSession(conn Connection, cfg *Config, masterPassword string) error {
 	customHttpClient := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: conn.Insecure},
@@ -408,6 +408,34 @@ func startInteractiveSession(conn Connection) error {
 					var resp *connect.Response[pb.DeleteUserResponse]
 					if resp, err = client.DeleteUser(context.Background(), req); err == nil {
 						fmt.Printf("%s\n", resp.Msg.Message)
+						return
+					}
+				case "reset":
+					if len(parts) != 3 {
+						fmt.Println("Usage: user reset <username>")
+						return
+					}
+					req := connect.NewRequest(&pb.ResetUserRequest{Username: parts[2]})
+					req.Header().Set("Authorization", "Bearer "+sessionToken)
+					var resp *connect.Response[pb.ResetUserResponse]
+
+					if resp, err = client.ResetUser(context.Background(), req); err == nil {
+						if resp.Msg.Flag {
+							// This means they reset THEIR OWN token!
+							// Update the vault in memory and save to disk silently
+							for i, configConn := range cfg.Connections {
+								if configConn.URL == conn.URL {
+									cfg.Connections[i].Key = resp.Msg.Token
+									conn.Key = resp.Msg.Token
+									saveConfig(*cfg, masterPassword)
+									break
+								}
+							}
+							fmt.Printf("Your token was reset! Your local Theoros vault was updated automatically.\n(New Token: %s)\n", resp.Msg.Token)
+						} else {
+							// They reset someone else's token
+							fmt.Printf("Token reset for '%s':\n%s\nSend this to them securely!\n", parts[2], resp.Msg.Token)
+						}
 						return
 					}
 				default:
@@ -579,6 +607,7 @@ func startInteractiveSession(conn Connection) error {
 					{Text: "list", Description: "List registered users"},
 					{Text: "generate", Description: "Generate a new user token"},
 					{Text: "delete", Description: "Delete a user"},
+					{Text: "reset", Description: "Reset a user's token"},
 				}
 				return prompt.FilterHasPrefix(userCmds, args[len(args)-1], true)
 			}
