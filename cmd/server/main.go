@@ -513,7 +513,7 @@ func (s *TheorosServer) GetCompletions(ctx context.Context, req *connect.Request
 	return connect.NewResponse(&pb.GetCompletionsResponse{Suggestions: suggestions}), nil
 }
 
-func main() {
+func main() { //test
 	log.Println("Starting Theoros Server...")
 	bootstrapPath := "/etc/theoros/bootstrap/credentials"
 	credBytes, err := os.ReadFile(bootstrapPath)
