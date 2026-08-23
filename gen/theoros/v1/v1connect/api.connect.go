@@ -50,6 +50,9 @@ const (
 	// KubernetesServiceDeleteUserProcedure is the fully-qualified name of the KubernetesService's
 	// DeleteUser RPC.
 	KubernetesServiceDeleteUserProcedure = "/theoros.v1.KubernetesService/DeleteUser"
+	// KubernetesServiceResetUserProcedure is the fully-qualified name of the KubernetesService's
+	// ResetUser RPC.
+	KubernetesServiceResetUserProcedure = "/theoros.v1.KubernetesService/ResetUser"
 	// KubernetesServiceGetCompletionsProcedure is the fully-qualified name of the KubernetesService's
 	// GetCompletions RPC.
 	KubernetesServiceGetCompletionsProcedure = "/theoros.v1.KubernetesService/GetCompletions"
@@ -64,6 +67,7 @@ type KubernetesServiceClient interface {
 	GenerateToken(context.Context, *connect.Request[v1.GenerateTokenRequest]) (*connect.Response[v1.GenerateTokenResponse], error)
 	ListUsers(context.Context, *connect.Request[v1.ListUsersRequest]) (*connect.Response[v1.ListUsersResponse], error)
 	DeleteUser(context.Context, *connect.Request[v1.DeleteUserRequest]) (*connect.Response[v1.DeleteUserResponse], error)
+	ResetUser(context.Context, *connect.Request[v1.ResetUserRequest]) (*connect.Response[v1.ResetUserResponse], error)
 	// Autocompletion Engine
 	GetCompletions(context.Context, *connect.Request[v1.GetCompletionsRequest]) (*connect.Response[v1.GetCompletionsResponse], error)
 }
@@ -115,6 +119,12 @@ func NewKubernetesServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(kubernetesServiceMethods.ByName("DeleteUser")),
 			connect.WithClientOptions(opts...),
 		),
+		resetUser: connect.NewClient[v1.ResetUserRequest, v1.ResetUserResponse](
+			httpClient,
+			baseURL+KubernetesServiceResetUserProcedure,
+			connect.WithSchema(kubernetesServiceMethods.ByName("ResetUser")),
+			connect.WithClientOptions(opts...),
+		),
 		getCompletions: connect.NewClient[v1.GetCompletionsRequest, v1.GetCompletionsResponse](
 			httpClient,
 			baseURL+KubernetesServiceGetCompletionsProcedure,
@@ -132,6 +142,7 @@ type kubernetesServiceClient struct {
 	generateToken   *connect.Client[v1.GenerateTokenRequest, v1.GenerateTokenResponse]
 	listUsers       *connect.Client[v1.ListUsersRequest, v1.ListUsersResponse]
 	deleteUser      *connect.Client[v1.DeleteUserRequest, v1.DeleteUserResponse]
+	resetUser       *connect.Client[v1.ResetUserRequest, v1.ResetUserResponse]
 	getCompletions  *connect.Client[v1.GetCompletionsRequest, v1.GetCompletionsResponse]
 }
 
@@ -165,6 +176,11 @@ func (c *kubernetesServiceClient) DeleteUser(ctx context.Context, req *connect.R
 	return c.deleteUser.CallUnary(ctx, req)
 }
 
+// ResetUser calls theoros.v1.KubernetesService.ResetUser.
+func (c *kubernetesServiceClient) ResetUser(ctx context.Context, req *connect.Request[v1.ResetUserRequest]) (*connect.Response[v1.ResetUserResponse], error) {
+	return c.resetUser.CallUnary(ctx, req)
+}
+
 // GetCompletions calls theoros.v1.KubernetesService.GetCompletions.
 func (c *kubernetesServiceClient) GetCompletions(ctx context.Context, req *connect.Request[v1.GetCompletionsRequest]) (*connect.Response[v1.GetCompletionsResponse], error) {
 	return c.getCompletions.CallUnary(ctx, req)
@@ -179,6 +195,7 @@ type KubernetesServiceHandler interface {
 	GenerateToken(context.Context, *connect.Request[v1.GenerateTokenRequest]) (*connect.Response[v1.GenerateTokenResponse], error)
 	ListUsers(context.Context, *connect.Request[v1.ListUsersRequest]) (*connect.Response[v1.ListUsersResponse], error)
 	DeleteUser(context.Context, *connect.Request[v1.DeleteUserRequest]) (*connect.Response[v1.DeleteUserResponse], error)
+	ResetUser(context.Context, *connect.Request[v1.ResetUserRequest]) (*connect.Response[v1.ResetUserResponse], error)
 	// Autocompletion Engine
 	GetCompletions(context.Context, *connect.Request[v1.GetCompletionsRequest]) (*connect.Response[v1.GetCompletionsResponse], error)
 }
@@ -226,6 +243,12 @@ func NewKubernetesServiceHandler(svc KubernetesServiceHandler, opts ...connect.H
 		connect.WithSchema(kubernetesServiceMethods.ByName("DeleteUser")),
 		connect.WithHandlerOptions(opts...),
 	)
+	kubernetesServiceResetUserHandler := connect.NewUnaryHandler(
+		KubernetesServiceResetUserProcedure,
+		svc.ResetUser,
+		connect.WithSchema(kubernetesServiceMethods.ByName("ResetUser")),
+		connect.WithHandlerOptions(opts...),
+	)
 	kubernetesServiceGetCompletionsHandler := connect.NewUnaryHandler(
 		KubernetesServiceGetCompletionsProcedure,
 		svc.GetCompletions,
@@ -246,6 +269,8 @@ func NewKubernetesServiceHandler(svc KubernetesServiceHandler, opts ...connect.H
 			kubernetesServiceListUsersHandler.ServeHTTP(w, r)
 		case KubernetesServiceDeleteUserProcedure:
 			kubernetesServiceDeleteUserHandler.ServeHTTP(w, r)
+		case KubernetesServiceResetUserProcedure:
+			kubernetesServiceResetUserHandler.ServeHTTP(w, r)
 		case KubernetesServiceGetCompletionsProcedure:
 			kubernetesServiceGetCompletionsHandler.ServeHTTP(w, r)
 		default:
@@ -279,6 +304,10 @@ func (UnimplementedKubernetesServiceHandler) ListUsers(context.Context, *connect
 
 func (UnimplementedKubernetesServiceHandler) DeleteUser(context.Context, *connect.Request[v1.DeleteUserRequest]) (*connect.Response[v1.DeleteUserResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("theoros.v1.KubernetesService.DeleteUser is not implemented"))
+}
+
+func (UnimplementedKubernetesServiceHandler) ResetUser(context.Context, *connect.Request[v1.ResetUserRequest]) (*connect.Response[v1.ResetUserResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("theoros.v1.KubernetesService.ResetUser is not implemented"))
 }
 
 func (UnimplementedKubernetesServiceHandler) GetCompletions(context.Context, *connect.Request[v1.GetCompletionsRequest]) (*connect.Response[v1.GetCompletionsResponse], error) {
