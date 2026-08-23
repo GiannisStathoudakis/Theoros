@@ -28,8 +28,6 @@ spec:
             readOnlyRootFilesystem: true
           
           volumeMounts:
-            - name: db-storage
-              mountPath: /data
             - name: tmp-dir
               mountPath: /tmp
             - name: bootstrap-secret
@@ -42,9 +40,6 @@ spec:
               protocol: TCP
               
       volumes:
-        - name: db-storage
-          persistentVolumeClaim:
-            claimName: {{ include "theoros.fullname" . }}-db-pvc
         - name: tmp-dir
           emptyDir: {}
         - name: bootstrap-secret
