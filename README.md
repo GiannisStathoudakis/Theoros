@@ -81,6 +81,19 @@ jane.smith
 User 'john.doe' has been successfully removed.
 ```
 
+**Resetting another team member's token:**
+```bash
+> user reset john.doe
+Token reset for 'john.doe':
+th-f2d68e8b...
+Send this to them securely!
+```
+**Resetting your own token (updates your vault automatically):**
+```bash
+> user reset john.doe
+Your token was reset! Your local Theoros vault was updated automatically.
+(New Token: th_token_abc123def456...)
+```
 ---
 
 ## Installation (Client)
