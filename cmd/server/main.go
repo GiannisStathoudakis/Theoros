@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -21,7 +20,6 @@ import (
 	"github.com/gorilla/websocket"
 	"golang.org/x/crypto/bcrypt"
 	cmdutil "k8s.io/kubectl/pkg/cmd/util"
-	_ "modernc.org/sqlite" // SQLite Driver
 
 	// Kubernetes client-go
 	corev1 "k8s.io/api/core/v1"
@@ -29,6 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/util/retry"
 
 	// Generated Protobuf Imports
 	pb "github.com/GiannisStathoudakis/Theoros/gen/theoros/v1"
@@ -45,39 +44,41 @@ func init() {
 	})
 }
 
+type contextKey string
+
+const userCtxKey contextKey = "username"
+
 type TheorosServer struct {
 	secretKey []byte
-	db        *sql.DB
+	clientset *kubernetes.Clientset
+	namespace string
 }
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true }, // Allow all origins for CLI
 }
 
-func getOrGenerateJWTSecret() []byte {
+func getClientsetAndNamespace() (*kubernetes.Clientset, string) {
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		log.Fatalf("Fatal: Failed to load in-cluster K8s config: %v", err)
 	}
-
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		log.Fatalf("Fatal: Failed to create K8s client: %v", err)
 	}
-
-	// Get the namespace the pod is currently running in
 	nsBytes, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 	if err != nil {
 		log.Fatalf("Fatal: Cannot determine namespace: %v", err)
 	}
+	return clientset, string(nsBytes)
+}
 
-	namespace := string(nsBytes)
+func getOrGenerateJWTSecret(clientset *kubernetes.Clientset, namespace string) []byte {
 	secretName := "theoros-jwt-master"
-
 	secretsClient := clientset.CoreV1().Secrets(namespace)
 	sec, err := secretsClient.Get(context.Background(), secretName, metav1.GetOptions{})
 
-	// If it exists, return it
 	if err == nil {
 		if key, ok := sec.Data["master.key"]; ok {
 			log.Println("[Boot] Loaded existing Master JWT Key from Kubernetes Secret.")
@@ -87,7 +88,6 @@ func getOrGenerateJWTSecret() []byte {
 		log.Fatalf("Fatal: Error communicating with K8s API: %v", err)
 	}
 
-	// If it does not exist, generate a new 32-byte secure key
 	log.Println("[Boot] Master JWT Key not found. Generating a new one...")
 	newKey := make([]byte, 32)
 	_, _ = rand.Read(newKey)
@@ -96,59 +96,41 @@ func getOrGenerateJWTSecret() []byte {
 		ObjectMeta: metav1.ObjectMeta{Name: secretName},
 		Data:       map[string][]byte{"master.key": newKey},
 	}
-
 	_, err = secretsClient.Create(context.Background(), newSecret, metav1.CreateOptions{})
 	if err != nil {
-		// If another replica created it exactly at the same time, just fetch theirs
 		if k8serrors.IsAlreadyExists(err) {
 			sec, _ = secretsClient.Get(context.Background(), secretName, metav1.GetOptions{})
 			return sec.Data["master.key"]
 		}
 		log.Fatalf("Fatal: Could not save JWT secret to K8s: %v", err)
 	}
-
 	log.Println("[Boot] Successfully saved new Master JWT Key to Kubernetes Secret.")
 	return newKey
 }
 
-func initDB(dbPath, bootstrapUser, bootstrapPass string) *sql.DB {
-	// Check if the database file already exists
-	_, err := os.Stat(dbPath)
-	dbExists := err == nil
+func initUserSecret(clientset *kubernetes.Clientset, namespace, bootstrapUser, bootstrapPass string) {
+	secretName := "theoros-users"
+	secretsClient := clientset.CoreV1().Secrets(namespace)
+	_, err := secretsClient.Get(context.Background(), secretName, metav1.GetOptions{})
 
-	// Open/Create with strict 0600 Linux permissions
-	file, err := os.OpenFile(dbPath, os.O_CREATE|os.O_RDWR, 0600)
-	if err != nil {
-		log.Fatalf("Fatal: Failed to create strict DB file: %v", err)
+	if err == nil {
+		log.Println("[Boot] Existing Kubernetes users database found. Skipping bootstrap injection.")
+		return
 	}
-	file.Close()
-	os.Chmod(dbPath, 0600)
-
-	db, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		log.Fatalf("Fatal: Failed to open SQLite database: %v", err)
-	}
-	createTable := `CREATE TABLE IF NOT EXISTS users (username TEXT PRIMARY KEY, password_hash TEXT NOT NULL);`
-	if _, err := db.Exec(createTable); err != nil {
-		log.Fatalf("Fatal: Failed to create users table: %v", err)
+	if !k8serrors.IsNotFound(err) {
+		log.Fatalf("Fatal: Error communicating with K8s API: %v", err)
 	}
 
-	// ONLY inject the bootstrap user if this is a brand new database!
-	if !dbExists {
-		hash, err := bcrypt.GenerateFromPassword([]byte(bootstrapPass), bcrypt.DefaultCost)
-		if err != nil {
-			log.Fatalf("Fatal: Failed to hash bootstrap password: %v", err)
-		}
-
-		insertStmt := `INSERT INTO users (username, password_hash) VALUES (?, ?)`
-		if _, err := db.Exec(insertStmt, bootstrapUser, hash); err != nil {
-			log.Fatalf("Fatal: Failed to inject bootstrap user: %v", err)
-		}
-		log.Printf("[Boot] Brand new database initialized. Bootstrap user '%s' injected.", bootstrapUser)
-	} else {
-		log.Println("[Boot] Existing SQLite database found and loaded. Skipping bootstrap injection.")
+	hash, _ := bcrypt.GenerateFromPassword([]byte(bootstrapPass), bcrypt.DefaultCost)
+	newSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: secretName},
+		Data:       map[string][]byte{bootstrapUser: hash},
 	}
-	return db
+	_, err = secretsClient.Create(context.Background(), newSecret, metav1.CreateOptions{})
+	if err != nil && !k8serrors.IsAlreadyExists(err) {
+		log.Fatalf("Fatal: Failed to create users secret database: %v", err)
+	}
+	log.Printf("[Boot] Brand new database initialized. Bootstrap user '%s' injected.", bootstrapUser)
 }
 
 func (s *TheorosServer) Login(ctx context.Context, req *connect.Request[pb.LoginRequest]) (*connect.Response[pb.LoginResponse], error) {
@@ -157,21 +139,16 @@ func (s *TheorosServer) Login(ctx context.Context, req *connect.Request[pb.Login
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("token cannot be empty"))
 	}
 
-	// Fetch ALL users and their hashes from the DB
-	rows, err := s.db.Query("SELECT username, password_hash FROM users")
+	sec, err := s.clientset.CoreV1().Secrets(s.namespace).Get(ctx, "theoros-users", metav1.GetOptions{})
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("database error"))
+		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to read users database"))
 	}
-	defer rows.Close()
 
 	var matchedUsername string
-	for rows.Next() {
-		var u, hash string
-		if err := rows.Scan(&u, &hash); err == nil {
-			if bcrypt.CompareHashAndPassword([]byte(hash), []byte(providedToken)) == nil {
-				matchedUsername = u
-				break
-			}
+	for username, hash := range sec.Data {
+		if bcrypt.CompareHashAndPassword(hash, []byte(providedToken)) == nil {
+			matchedUsername = username
+			break
 		}
 	}
 
@@ -180,7 +157,6 @@ func (s *TheorosServer) Login(ctx context.Context, req *connect.Request[pb.Login
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid credentials"))
 	}
 
-	// Generate JWT for the matched user
 	claims := jwt.MapClaims{"username": matchedUsername, "authorized": true, "exp": time.Now().Add(time.Hour * 1).Unix()}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString(s.secretKey)
@@ -190,6 +166,134 @@ func (s *TheorosServer) Login(ctx context.Context, req *connect.Request[pb.Login
 
 	log.Printf("[Audit] Successful login for user: %s", matchedUsername)
 	return connect.NewResponse(&pb.LoginResponse{Token: tokenString}), nil
+}
+
+// ==========================================
+// USER MANAGEMENT
+// ==========================================
+func (s *TheorosServer) GenerateToken(ctx context.Context, req *connect.Request[pb.GenerateTokenRequest]) (*connect.Response[pb.GenerateTokenResponse], error) {
+	username := strings.TrimSpace(req.Msg.Username)
+	keyBytes := make([]byte, 24)
+	rand.Read(keyBytes)
+	plainToken := "th-" + hex.EncodeToString(keyBytes)
+	hash, _ := bcrypt.GenerateFromPassword([]byte(plainToken), bcrypt.DefaultCost)
+
+	// RetryOnConflict ensures multiple pods don't overwrite each other!
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		sec, err := s.clientset.CoreV1().Secrets(s.namespace).Get(ctx, "theoros-users", metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if _, exists := sec.Data[username]; exists {
+			return errors.New("user already exists. Use 'user reset' to overwrite.")
+		}
+		if sec.Data == nil {
+			sec.Data = make(map[string][]byte)
+		}
+		sec.Data[username] = hash
+		_, err = s.clientset.CoreV1().Secrets(s.namespace).Update(ctx, sec, metav1.UpdateOptions{})
+		return err
+	})
+
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	return connect.NewResponse(&pb.GenerateTokenResponse{Token: plainToken}), nil
+}
+
+func (s *TheorosServer) ResetUser(ctx context.Context, req *connect.Request[pb.ResetUserRequest]) (*connect.Response[pb.ResetUserResponse], error) {
+	username := strings.TrimSpace(req.Msg.Username)
+	keyBytes := make([]byte, 24)
+	rand.Read(keyBytes)
+	plainToken := "th-" + hex.EncodeToString(keyBytes)
+	hash, _ := bcrypt.GenerateFromPassword([]byte(plainToken), bcrypt.DefaultCost)
+
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		sec, err := s.clientset.CoreV1().Secrets(s.namespace).Get(ctx, "theoros-users", metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if _, exists := sec.Data[username]; !exists {
+			return errors.New("user does not exist")
+		}
+		sec.Data[username] = hash
+		_, err = s.clientset.CoreV1().Secrets(s.namespace).Update(ctx, sec, metav1.UpdateOptions{})
+		return err
+	})
+
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, err)
+	}
+
+	caller, _ := ctx.Value(userCtxKey).(string)
+	isSelf := caller == username
+
+	return connect.NewResponse(&pb.ResetUserResponse{
+		Token: plainToken,
+		Flag:  isSelf,
+	}), nil
+}
+
+func (s *TheorosServer) ListUsers(ctx context.Context, req *connect.Request[pb.ListUsersRequest]) (*connect.Response[pb.ListUsersResponse], error) {
+	sec, err := s.clientset.CoreV1().Secrets(s.namespace).Get(ctx, "theoros-users", metav1.GetOptions{})
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to read users"))
+	}
+	var users []string
+	for u := range sec.Data {
+		users = append(users, u)
+	}
+	return connect.NewResponse(&pb.ListUsersResponse{Usernames: users}), nil
+}
+
+func (s *TheorosServer) DeleteUser(ctx context.Context, req *connect.Request[pb.DeleteUserRequest]) (*connect.Response[pb.DeleteUserResponse], error) {
+	username := strings.TrimSpace(req.Msg.Username)
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		sec, err := s.clientset.CoreV1().Secrets(s.namespace).Get(ctx, "theoros-users", metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if _, exists := sec.Data[username]; !exists {
+			return errors.New("user not found")
+		}
+		delete(sec.Data, username)
+		_, err = s.clientset.CoreV1().Secrets(s.namespace).Update(ctx, sec, metav1.UpdateOptions{})
+		return err
+	})
+
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, err)
+	}
+	return connect.NewResponse(&pb.DeleteUserResponse{Message: fmt.Sprintf("User '%s' deleted successfully", username)}), nil
+}
+
+// ==========================================
+// INTERCEPTORS & KUBECTL EXECUTION
+// ==========================================
+func NewAuthInterceptor(secretKey []byte) connect.UnaryInterceptorFunc {
+	return func(next connect.UnaryFunc) connect.UnaryFunc {
+		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
+			if strings.HasSuffix(req.Spec().Procedure, "Login") {
+				return next(ctx, req)
+			}
+			tokenString := strings.TrimPrefix(req.Header().Get("Authorization"), "Bearer ")
+			if tokenString == "" {
+				return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("missing authorization token"))
+			}
+			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) { return secretKey, nil })
+			if err != nil || !token.Valid {
+				return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid or expired token"))
+			}
+
+			// Inject username into context for self-reset logic
+			if claims, ok := token.Claims.(jwt.MapClaims); ok {
+				if username, ok := claims["username"].(string); ok {
+					ctx = context.WithValue(ctx, userCtxKey, username)
+				}
+			}
+			return next(ctx, req)
+		}
+	}
 }
 
 func (s *TheorosServer) ExecuteCommand(ctx context.Context, req *connect.Request[pb.CommandRequest]) (res *connect.Response[pb.CommandResponse], err error) {
@@ -324,7 +428,6 @@ func (s *TheorosServer) WebSocketHandler(w http.ResponseWriter, r *http.Request)
 	}
 	defer ws.Close()
 
-	// Read the first message as the command configuration
 	_, msg, err := ws.ReadMessage()
 	if err != nil {
 		return
@@ -334,13 +437,10 @@ func (s *TheorosServer) WebSocketHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	log.Printf("[Audit-WS] Starting Interactive Exec: %s (namespace: '%s')", req.Action, req.Namespace)
-
-	// Clean flags to prevent kubectl from complaining about fake TTY
 	cleanFlags := []string{}
 	for _, f := range req.Flags {
 		if f == "-it" || f == "-ti" {
-			cleanFlags = append(cleanFlags, "-i") // Strip the T, keep the I
+			cleanFlags = append(cleanFlags, "-i")
 		} else if f != "-t" && f != "--tty" {
 			cleanFlags = append(cleanFlags, f)
 		}
@@ -360,7 +460,6 @@ func (s *TheorosServer) WebSocketHandler(w http.ResponseWriter, r *http.Request)
 		args = append(args, cleanFlags...)
 	}
 
-	// Create a pipe to bridge the WebSocket reads to kubectl's Stdin
 	pr, pw := io.Pipe()
 	go func() {
 		for {
@@ -387,99 +486,11 @@ func (s *TheorosServer) WebSocketHandler(w http.ResponseWriter, r *http.Request)
 
 	defer func() {
 		if r := recover(); r != nil {
-			log.Printf("[Audit-WS] Recovered from panic: %v", r)
 			ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("\r\n❌ Session terminated: %v\r\n", r)))
 		}
 	}()
 
 	_ = kubectlCmd.Execute()
-	log.Printf("[Audit-WS] Interactive session closed cleanly.")
-}
-
-func NewAuthInterceptor(secretKey []byte) connect.UnaryInterceptorFunc {
-	return func(next connect.UnaryFunc) connect.UnaryFunc {
-		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-			if strings.HasSuffix(req.Spec().Procedure, "Login") {
-				return next(ctx, req)
-			}
-			tokenString := strings.TrimPrefix(req.Header().Get("Authorization"), "Bearer ")
-			if tokenString == "" {
-				return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("missing authorization token"))
-			}
-			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) { return secretKey, nil })
-			if err != nil || !token.Valid {
-				return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid or expired token"))
-			}
-			return next(ctx, req)
-		}
-	}
-}
-
-func main() {
-	log.Println("Starting Theoros Server...")
-	bootstrapPath := "/etc/theoros/bootstrap/credentials"
-	credBytes, err := os.ReadFile(bootstrapPath)
-	if err != nil {
-		log.Fatalf("Fatal: Bootstrap credentials not found: %v", err)
-	}
-	parts := strings.SplitN(strings.TrimSpace(string(credBytes)), ":", 2)
-	bootstrapUser, bootstrapPass := parts[0], parts[1]
-
-	jwtSecretKey := getOrGenerateJWTSecret()
-	db := initDB("/data/theoros.db", bootstrapUser, bootstrapPass)
-	defer db.Close()
-
-	server := &TheorosServer{secretKey: jwtSecretKey, db: db}
-	mux := http.NewServeMux()
-	path, handler := v1connect.NewKubernetesServiceHandler(server, connect.WithInterceptors(NewAuthInterceptor(jwtSecretKey)))
-
-	mux.Handle(path, handler)
-	mux.HandleFunc("/ws/exec", server.WebSocketHandler) // 🚨 NEW WEBSOCKET ROUTE!
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-	s := http.Server{Addr: ":" + port, Handler: mux, Protocols: &http.Protocols{}}
-	s.Protocols.SetHTTP1(true)
-	s.Protocols.SetUnencryptedHTTP2(true)
-
-	log.Printf("Connect RPC Server running on %s", s.Addr)
-	if err := s.ListenAndServe(); err != nil {
-		log.Fatalf("Server crashed: %v", err)
-	}
-}
-
-func (s *TheorosServer) GenerateToken(ctx context.Context, req *connect.Request[pb.GenerateTokenRequest]) (*connect.Response[pb.GenerateTokenResponse], error) {
-	username := strings.TrimSpace(req.Msg.Username)
-	keyBytes := make([]byte, 24)
-	rand.Read(keyBytes)
-	plainToken := "th-" + hex.EncodeToString(keyBytes)
-	hash, _ := bcrypt.GenerateFromPassword([]byte(plainToken), bcrypt.DefaultCost)
-	s.db.Exec(`INSERT INTO users (username, password_hash) VALUES (?, ?) ON CONFLICT(username) DO UPDATE SET password_hash=excluded.password_hash;`, username, hash)
-	return connect.NewResponse(&pb.GenerateTokenResponse{Token: plainToken}), nil
-}
-
-func (s *TheorosServer) ListUsers(ctx context.Context, req *connect.Request[pb.ListUsersRequest]) (*connect.Response[pb.ListUsersResponse], error) {
-	rows, _ := s.db.Query("SELECT username FROM users")
-	defer rows.Close()
-	var users []string
-	for rows.Next() {
-		var u string
-		rows.Scan(&u)
-		users = append(users, u)
-	}
-	return connect.NewResponse(&pb.ListUsersResponse{Usernames: users}), nil
-}
-
-func (s *TheorosServer) DeleteUser(ctx context.Context, req *connect.Request[pb.DeleteUserRequest]) (*connect.Response[pb.DeleteUserResponse], error) {
-	username := strings.TrimSpace(req.Msg.Username)
-	res, _ := s.db.Exec("DELETE FROM users WHERE username = ?", username)
-	affected, _ := res.RowsAffected()
-	if affected == 0 {
-		return nil, connect.NewError(connect.CodeNotFound, errors.New("user not found"))
-	}
-	return connect.NewResponse(&pb.DeleteUserResponse{Message: fmt.Sprintf("User '%s' deleted successfully", username)}), nil
 }
 
 func (s *TheorosServer) GetCompletions(ctx context.Context, req *connect.Request[pb.GetCompletionsRequest]) (res *connect.Response[pb.GetCompletionsResponse], err error) {
@@ -500,4 +511,44 @@ func (s *TheorosServer) GetCompletions(ctx context.Context, req *connect.Request
 		suggestions = append(suggestions, strings.TrimSpace(strings.SplitN(line, "\t", 2)[0]))
 	}
 	return connect.NewResponse(&pb.GetCompletionsResponse{Suggestions: suggestions}), nil
+}
+
+func main() {
+	log.Println("Starting Theoros Server...")
+	bootstrapPath := "/etc/theoros/bootstrap/credentials"
+	credBytes, err := os.ReadFile(bootstrapPath)
+	if err != nil {
+		log.Fatalf("Fatal: Bootstrap credentials not found: %v", err)
+	}
+	parts := strings.SplitN(strings.TrimSpace(string(credBytes)), ":", 2)
+	bootstrapUser, bootstrapPass := parts[0], parts[1]
+
+	clientset, namespace := getClientsetAndNamespace()
+	jwtSecretKey := getOrGenerateJWTSecret(clientset, namespace)
+	initUserSecret(clientset, namespace, bootstrapUser, bootstrapPass)
+
+	server := &TheorosServer{
+		secretKey: jwtSecretKey,
+		clientset: clientset,
+		namespace: namespace,
+	}
+
+	mux := http.NewServeMux()
+	path, handler := v1connect.NewKubernetesServiceHandler(server, connect.WithInterceptors(NewAuthInterceptor(jwtSecretKey)))
+
+	mux.Handle(path, handler)
+	mux.HandleFunc("/ws/exec", server.WebSocketHandler)
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	s := http.Server{Addr: ":" + port, Handler: mux, Protocols: &http.Protocols{}}
+	s.Protocols.SetHTTP1(true)
+	s.Protocols.SetUnencryptedHTTP2(true)
+
+	log.Printf("Connect RPC Server running on %s", s.Addr)
+	if err := s.ListenAndServe(); err != nil {
+		log.Fatalf("Server crashed: %v", err)
+	}
 }
