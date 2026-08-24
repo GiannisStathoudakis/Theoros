@@ -17,6 +17,7 @@ Built entirely with security in mind, Theoros operates on a strict split archite
 * **Client-Side User Management:** Administrators can seamlessly generate, list, and manage user identities and access tokens directly from the client interface.
 
 ### 2. The Server (In-Cluster Agent)
+* **100% Stateless & HA Ready:** Theoros uses native Kubernetes Secrets for user identities and cryptographic signing keys. Run 1 replica or scale to 3+ replicas for High Availability without needing persistent volumes (`PVCs`) or external databases.
 * **Lightweight Go Pod:** The server is a highly efficient Go binary running as a standard pod. There is no need for users to edit or manage any `kubeconfig` files—administrators simply deploy the server and it runs.
 * **Connect-RPC Powered:** The system leverages the Connect-RPC framework for fast, reliable, and highly compatible communication between the client and the cluster.
 * **Standard Web Security:** To ensure maximum compatibility and security, Theoros does not manage its own certificates. Traffic and SSL/TLS termination must be routed through your standard Ingress controller or Gateway API.
@@ -63,8 +64,9 @@ Once connected as an administrator, you can manage team access directly from the
 **Add a new user:**
 ```bash
 > user generate john.doe
-User 'john.doe' created successfully.
-Auth Token: th_token_abc123def456...  # Share this securely with the user
+Token generated for 'john.doe':
+th-f2d68e8b096828f4c8a9b282bbaa650ecc93f7f17cd03697
+Copy this now!
 ```
 
 **List all active users:**
