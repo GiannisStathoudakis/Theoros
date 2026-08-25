@@ -1,7 +1,7 @@
 # Theoros
 
 ## What is Theoros?
-**Theoros** is a zero-trust, interactive terminal and remote-execution agent for Kubernetes.
+**Theoros** is a interactive terminal and remote-execution agent for Kubernetes.
 
 Distributing highly-privileged `kubeconfig` files to hosts presents significant security challenges. Theoros is designed to eliminate this risk. The agent executes commands on behalf of the user and streams the results back to the terminal. This architecture removes the need for local `kubeconfig` files, providing clean, zero-trust access to the cluster.
 
