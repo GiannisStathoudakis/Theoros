@@ -30,9 +30,6 @@ spec:
           volumeMounts:
             - name: tmp-dir
               mountPath: /tmp
-            - name: bootstrap-secret
-              mountPath: /etc/theoros/bootstrap
-              readOnly: true
               
           ports:
             - name: grpc
@@ -42,6 +39,3 @@ spec:
       volumes:
         - name: tmp-dir
           emptyDir: {}
-        - name: bootstrap-secret
-          secret:
-            secretName: theoros-cred
