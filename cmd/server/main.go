@@ -566,7 +566,7 @@ func (s *TheorosServer) WebSocketHandler(w http.ResponseWriter, r *http.Request)
 
 	defer func() {
 		if r := recover(); r != nil {
-			ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("\r\n❌ Session terminated: %v\r\n", r)))
+			ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("\r\nSession terminated: %v\r\n", r)))
 		}
 	}()
 
