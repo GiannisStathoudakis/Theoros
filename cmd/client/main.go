@@ -565,15 +565,24 @@ func startInteractiveSession(conn Connection, cfg *Config, masterPassword string
 			return
 
 		} else if isStreaming {
-			// ROUTE B: Server-Side Streams (Logs -f, Get -w)
-			if stateErr == nil {
-				term.Restore(fd, healthyState)
-			}
-
 			streamCtx, cancelStream := context.WithCancel(context.Background())
-			sigCh := make(chan os.Signal, 1)
-			signal.Notify(sigCh, os.Interrupt)
-			go func() { <-sigCh; cancelStream() }()
+
+			go func() {
+				buf := make([]byte, 1)
+				for {
+					if streamCtx.Err() != nil {
+						return
+					}
+					n, err := os.Stdin.Read(buf)
+					if err != nil || n == 0 {
+						continue
+					}
+					if buf[0] == 3 || buf[0] == 4 {
+						cancelStream()
+						return
+					}
+				}
+			}()
 
 			req := connect.NewRequest(&pb.ExecRequest{Action: action, Flags: flags})
 			req.Header().Set("Authorization", "Bearer "+sessionToken)
@@ -597,7 +606,6 @@ func startInteractiveSession(conn Connection, cfg *Config, masterPassword string
 				fmt.Printf("\nStream Error: %v\n", err)
 			}
 
-			signal.Stop(sigCh)
 			cancelStream()
 			return
 
