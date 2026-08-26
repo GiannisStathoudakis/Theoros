@@ -422,11 +422,28 @@ func (w *serverStreamWriter) Write(p []byte) (n int, err error) {
 }
 
 func (s *TheorosServer) InteractiveExec(ctx context.Context, req *connect.Request[pb.ExecRequest], stream *connect.ServerStream[pb.ExecResponse]) error {
-	caller, _ := ctx.Value(userCtxKey).(string)
-	if caller == "" {
-		caller = "unknown"
+	// Authenticate Streaming RPCs (Bypasses Unary Interceptor)
+	tokenString := strings.TrimPrefix(req.Header().Get("Authorization"), "Bearer ")
+	if tokenString == "" {
+		return connect.NewError(connect.CodeUnauthenticated, errors.New("missing authorization token"))
 	}
 
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) { return s.secretKey, nil })
+	if err != nil || !token.Valid {
+		return connect.NewError(connect.CodeUnauthenticated, errors.New("invalid or expired token"))
+	}
+
+	caller := "unknown"
+	if claims, ok := token.Claims.(jwt.MapClaims); ok {
+		if username, ok := claims["username"].(string); ok {
+			caller = username
+		}
+		if needsReset, ok := claims["needs_reset"].(bool); ok && needsReset {
+			return connect.NewError(connect.CodePermissionDenied, errors.New("SECURITY POLICY: You must run 'user reset' first."))
+		}
+	}
+
+	// Build the argument list
 	args := []string{req.Msg.Action}
 	if req.Msg.Resource != "" {
 		args = append(args, req.Msg.Resource)
@@ -461,7 +478,7 @@ func (s *TheorosServer) InteractiveExec(ctx context.Context, req *connect.Reques
 			log.Printf("[Audit-Stream] Recovered from panic: %v", r)
 		}
 	}()
-	err := kubectlCmd.ExecuteContext(ctx)
+	err = kubectlCmd.ExecuteContext(ctx)
 	if err != nil && !errors.Is(err, context.Canceled) {
 		return connect.NewError(connect.CodeUnknown, err)
 	}
@@ -496,6 +513,11 @@ func (s *TheorosServer) WebSocketHandler(w http.ResponseWriter, r *http.Request)
 	if claims, ok := token.Claims.(jwt.MapClaims); ok {
 		if u, ok := claims["username"].(string); ok {
 			username = u
+		}
+
+		if needsReset, ok := claims["needs_reset"].(bool); ok && needsReset {
+			http.Error(w, "SECURITY POLICY: You must run 'user reset' first.", http.StatusForbidden)
+			return
 		}
 	}
 
