@@ -5,7 +5,6 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"crypto/sha256"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -21,6 +20,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/c-bata/go-prompt"
 	"github.com/gorilla/websocket"
+	"golang.org/x/crypto/argon2"
 	"golang.org/x/term"
 
 	pb "github.com/GiannisStathoudakis/Theoros/gen/theoros/v1"
@@ -49,29 +49,58 @@ func init() {
 }
 
 // ==========================================
-// CRYPTO ENGINE (AES-GCM)
+// CRYPTO ENGINE
 // ==========================================
-func deriveKey(password string) []byte { hash := sha256.Sum256([]byte(password)); return hash[:] }
+func deriveKey(password string, salt []byte) []byte {
+	return argon2.IDKey([]byte(password), salt, 1, 64*1024, 4, 32)
+}
+
 func encrypt(data []byte, password string) []byte {
-	block, _ := aes.NewCipher(deriveKey(password))
+	// Generate a secure, random 16-byte salt
+	salt := make([]byte, 16)
+	io.ReadFull(rand.Reader, salt)
+
+	// Derive the key using the new random salt
+	block, _ := aes.NewCipher(deriveKey(password, salt))
 	gcm, _ := cipher.NewGCM(block)
+
+	// Generate a random nonce
 	nonce := make([]byte, gcm.NonceSize())
 	io.ReadFull(rand.Reader, nonce)
-	return gcm.Seal(nonce, nonce, data, nil)
+
+	// Encrypt the data
+	ciphertext := gcm.Seal(nonce, nonce, data, nil)
+
+	// [Salt][Nonce + Ciphertext]
+	return append(salt, ciphertext...)
 }
+
 func decrypt(data []byte, password string) ([]byte, error) {
-	block, err := aes.NewCipher(deriveKey(password))
+	// Ensure the file is at least long enough to hold a 16-byte salt + 12-byte nonce
+	if len(data) < 28 {
+		return nil, fmt.Errorf("corrupted or invalid file")
+	}
+
+	// Extract the 16-byte salt from the very beginning of the file
+	salt := data[:16]
+
+	//Derive the key using the extracted salt
+	block, err := aes.NewCipher(deriveKey(password, salt))
 	if err != nil {
 		return nil, err
 	}
+
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
 		return nil, err
 	}
-	if len(data) < gcm.NonceSize() {
-		return nil, fmt.Errorf("ciphertext too short")
-	}
-	nonce, ciphertext := data[:gcm.NonceSize()], data[gcm.NonceSize():]
+
+	// Separate the Nonce and the Ciphertext
+	nonceSize := gcm.NonceSize()
+	nonce := data[16 : 16+nonceSize]
+	ciphertext := data[16+nonceSize:]
+
+	// Decrypt
 	return gcm.Open(nil, nonce, ciphertext, nil)
 }
 
@@ -203,8 +232,14 @@ func main() {
 				continue
 			}
 
-			// 1. Auto-prefix with https:// if no prefix is given
-			if !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
+			if strings.HasPrefix(baseURL, "http://") {
+				fmt.Println("\nError: Plain HTTP is strictly prohibited by Theoros security policy. Please use HTTPS.")
+				time.Sleep(2 * time.Second)
+				continue
+			}
+
+			// Auto-prefix with HTTPS if missing
+			if !strings.HasPrefix(baseURL, "https://") {
 				baseURL = "https://" + baseURL
 			}
 
@@ -213,49 +248,27 @@ func main() {
 			probeClient := &http.Client{
 				Timeout: 3 * time.Second,
 				Transport: &http.Transport{
-					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // Allows probing self-signed certs
 				},
 			}
 
-			finalURL := baseURL
-			isHTTPS := strings.HasPrefix(baseURL, "https://")
-
 			resp, err := probeClient.Get(baseURL)
 
-			if err != nil && isHTTPS {
-				httpURL := strings.Replace(baseURL, "https://", "http://", 1)
-				respHTTP, errHTTP := probeClient.Get(httpURL)
-
-				if errHTTP == nil {
-					finalURL = httpURL
-					isHTTPS = false
-					fmt.Println("Detected HTTP.")
-					if respHTTP != nil {
-						respHTTP.Body.Close()
-					}
-				} else {
-					fmt.Println("Failed (Could not reach server on HTTPS or HTTP).")
-					time.Sleep(2 * time.Second)
-					continue
-				}
-			} else if err == nil {
-				fmt.Println("Detected HTTPS.")
-				if resp != nil {
-					resp.Body.Close()
-				}
-			} else {
-				fmt.Println("Failed (Could not reach server).")
+			if err != nil {
+				fmt.Println("Failed (Could not reach server). Ensure your cluster is accessible over HTTPS.")
 				time.Sleep(2 * time.Second)
 				continue
 			}
 
-			// Only ask about self-signed certs if HTTPS is used
-			insecure := false
-			if isHTTPS {
-				rawCert := prompt.Input("Is the certificate self-signed? (y/n): ", emptyCompleter)
-				certInput := strings.ToLower(strings.TrimSpace(rawCert))
-				insecure = certInput == "y" || certInput == "yes"
+			fmt.Println("Success.")
+			if resp != nil {
+				resp.Body.Close()
 			}
+
+			// Ask if they are using self-signed certs for local labs
+			rawCert := prompt.Input("Is the certificate self-signed? (y/n): ", emptyCompleter)
+			certInput := strings.ToLower(strings.TrimSpace(rawCert))
+			insecure := certInput == "y" || certInput == "yes"
 
 			// Get API Key and Login
 			newKey := strings.TrimSpace(getPassword("Enter API Key: "))
@@ -266,15 +279,38 @@ func main() {
 				},
 			}
 
-			client := v1connect.NewKubernetesServiceClient(customHttpClient, finalURL)
+			client := v1connect.NewKubernetesServiceClient(customHttpClient, baseURL)
 
-			if _, loginErr := client.Login(context.Background(), connect.NewRequest(&pb.LoginRequest{Token: newKey})); loginErr == nil {
-				cfg.Connections = append(cfg.Connections, Connection{URL: finalURL, Key: newKey, Insecure: insecure})
-				saveConfig(cfg, masterPassword)
-				feedbackMsg = "Connection added successfully!"
-			} else {
+			// Auto-Setup Flow Magic
+			loginResp, loginErr := client.Login(context.Background(), connect.NewRequest(&pb.LoginRequest{Token: newKey}))
+			if loginErr != nil {
 				feedbackMsg = "Authentication failed. Invalid API Key."
+				continue
 			}
+
+			if newKey == "th-admin-setup" {
+				fmt.Println("\n[Security] Default bootstrap token detected!")
+				fmt.Println("Rotating to a new secure token automatically...")
+
+				tempToken := loginResp.Msg.Token
+				req := connect.NewRequest(&pb.ResetUserRequest{Username: "admin"})
+				req.Header().Set("Authorization", "Bearer "+tempToken)
+
+				resetResp, resetErr := client.ResetUser(context.Background(), req)
+				if resetErr != nil {
+					feedbackMsg = "Failed to auto-rotate default token: " + resetErr.Error()
+					continue
+				}
+
+				newKey = resetResp.Msg.Token
+				fmt.Printf("\nSuccess! Your new permanent token is:\n%s\n(It has been saved to your vault automatically)\n", newKey)
+				time.Sleep(3 * time.Second)
+			}
+
+			cfg.Connections = append(cfg.Connections, Connection{URL: baseURL, Key: newKey, Insecure: insecure})
+			saveConfig(cfg, masterPassword)
+			feedbackMsg = "Connection added successfully!"
+
 			continue
 		}
 
@@ -309,7 +345,7 @@ func startInteractiveSession(conn Connection, cfg *Config, masterPassword string
 	sessionToken := loginResp.Msg.Token
 
 	clearScreen()
-	fmt.Printf("🔗 Connected to %s\n", conn.URL)
+	fmt.Printf("Connected to %s\n", conn.URL)
 
 	fd := int(os.Stdin.Fd())
 	healthyState, stateErr := term.GetState(fd)
@@ -332,7 +368,7 @@ func startInteractiveSession(conn Connection, cfg *Config, masterPassword string
 		// Built-in Help Menu
 		if in == "help" {
 			fmt.Println("==================================================")
-			fmt.Println("                 Theoros CLI Help                 ")
+			fmt.Println("                Theoros CLI Help                ")
 			fmt.Println("==================================================")
 			fmt.Println("Kubernetes Commands:")
 			fmt.Println("  - get pods [-A] [-w]               List or watch pods/events")
@@ -477,14 +513,18 @@ func startInteractiveSession(conn Connection, cfg *Config, masterPassword string
 				term.Restore(fd, healthyState)
 			}
 
-			wsURL := strings.Replace(conn.URL, "http", "ws", 1) + "/ws/exec?token=" + sessionToken
+			// Enforces secure wss:// strictly.
+			wsURL := strings.Replace(conn.URL, "https://", "wss://", 1) + "/ws/exec"
 
 			dialer := *websocket.DefaultDialer
 			if conn.Insecure {
 				dialer.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 			}
 
-			ws, _, err := dialer.Dial(wsURL, nil)
+			headers := http.Header{}
+			headers.Add("Authorization", "Bearer "+sessionToken)
+
+			ws, _, err := dialer.Dial(wsURL, headers)
 			if err != nil {
 				fmt.Printf("\r\nFailed to open interactive session: %v\r\n", err)
 				return
