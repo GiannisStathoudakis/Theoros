@@ -48,6 +48,9 @@ type contextKey string
 
 const userCtxKey contextKey = "username"
 
+// Decoy
+var dummyBcryptHash = []byte("$2a$10$vI8aWBnW3fID.ZQ4/zo1G.q1lRps.9cGLcZEiGDMVr5yUP1KUOYTa")
+
 type TheorosServer struct {
 	secretKey []byte
 	clientset *kubernetes.Clientset
@@ -108,7 +111,7 @@ func getOrGenerateJWTSecret(clientset *kubernetes.Clientset, namespace string) [
 	return newKey
 }
 
-func initUserSecret(clientset *kubernetes.Clientset, namespace, bootstrapUser, bootstrapPass string) {
+func initUserSecret(clientset *kubernetes.Clientset, namespace string) {
 	secretName := "theoros-users"
 	secretsClient := clientset.CoreV1().Secrets(namespace)
 	_, err := secretsClient.Get(context.Background(), secretName, metav1.GetOptions{})
@@ -121,16 +124,23 @@ func initUserSecret(clientset *kubernetes.Clientset, namespace, bootstrapUser, b
 		log.Fatalf("Fatal: Error communicating with K8s API: %v", err)
 	}
 
-	hash, _ := bcrypt.GenerateFromPassword([]byte(bootstrapPass), bcrypt.DefaultCost)
+	// Hardcoded default setup credentials which will be reset automatically in the 1st login
+	bootstrapUser := "admin"
+	fullBootstrapToken := "th-admin-setup"
+	hash, _ := bcrypt.GenerateFromPassword([]byte(fullBootstrapToken), bcrypt.DefaultCost)
+
 	newSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: secretName},
-		Data:       map[string][]byte{bootstrapUser: hash},
+		Data: map[string][]byte{
+			bootstrapUser:                  hash,
+			bootstrapUser + ".needs_reset": []byte("true"), // Flag them for mandatory reset
+		},
 	}
 	_, err = secretsClient.Create(context.Background(), newSecret, metav1.CreateOptions{})
 	if err != nil && !k8serrors.IsAlreadyExists(err) {
 		log.Fatalf("Fatal: Failed to create users secret database: %v", err)
 	}
-	log.Printf("[Boot] Brand new database initialized. Bootstrap user '%s' injected.", bootstrapUser)
+	log.Printf("[Boot] Brand new database initialized. Default user '%s' created.", bootstrapUser)
 }
 
 func (s *TheorosServer) Login(ctx context.Context, req *connect.Request[pb.LoginRequest]) (*connect.Response[pb.LoginResponse], error) {
@@ -139,32 +149,55 @@ func (s *TheorosServer) Login(ctx context.Context, req *connect.Request[pb.Login
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("token cannot be empty"))
 	}
 
+	// Enforce token format (th-<username>-<secret>)
+	if !strings.HasPrefix(providedToken, "th-") {
+		log.Println("[Security] Failed login attempt: Missing 'th-' prefix.")
+		_ = bcrypt.CompareHashAndPassword(dummyBcryptHash, []byte(providedToken))
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid credentials"))
+	}
+
+	body := strings.TrimPrefix(providedToken, "th-")
+	lastDashIdx := strings.LastIndex(body, "-")
+	if lastDashIdx == -1 || lastDashIdx == len(body)-1 {
+		log.Println("[Security] Failed login attempt: Malformed token format.")
+		_ = bcrypt.CompareHashAndPassword(dummyBcryptHash, []byte(providedToken))
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid credentials"))
+	}
+
+	targetUsername := body[:lastDashIdx]
+
 	sec, err := s.clientset.CoreV1().Secrets(s.namespace).Get(ctx, "theoros-users", metav1.GetOptions{})
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to read users database"))
 	}
 
-	var matchedUsername string
-	for username, hash := range sec.Data {
-		if bcrypt.CompareHashAndPassword(hash, []byte(providedToken)) == nil {
-			matchedUsername = username
-			break
-		}
-	}
-
-	if matchedUsername == "" {
-		log.Println("[Security] Failed login attempt: Invalid token provided.")
+	hash, exists := sec.Data[targetUsername]
+	if !exists {
+		_ = bcrypt.CompareHashAndPassword(dummyBcryptHash, []byte(providedToken))
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid credentials"))
 	}
 
-	claims := jwt.MapClaims{"username": matchedUsername, "authorized": true, "exp": time.Now().Add(time.Hour * 1).Unix()}
+	if err := bcrypt.CompareHashAndPassword(hash, []byte(providedToken)); err != nil {
+		log.Printf("[Security] Failed login attempt for user: %s", targetUsername)
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid credentials"))
+	}
+
+	// Check if the user is flagged for a mandatory reset
+	_, requiresReset := sec.Data[targetUsername+".needs_reset"]
+
+	claims := jwt.MapClaims{
+		"username":    targetUsername,
+		"authorized":  true,
+		"needs_reset": requiresReset,
+		"exp":         time.Now().Add(time.Hour * 1).Unix(),
+	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString(s.secretKey)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to generate token"))
 	}
 
-	log.Printf("[Audit] Successful login for user: %s", matchedUsername)
+	log.Printf("[Audit] Successful login for user: %s", targetUsername)
 	return connect.NewResponse(&pb.LoginResponse{Token: tokenString}), nil
 }
 
@@ -175,10 +208,11 @@ func (s *TheorosServer) GenerateToken(ctx context.Context, req *connect.Request[
 	username := strings.TrimSpace(req.Msg.Username)
 	keyBytes := make([]byte, 24)
 	rand.Read(keyBytes)
-	plainToken := "th-" + hex.EncodeToString(keyBytes)
+
+	// Format token as th-<username>-<secret>
+	plainToken := fmt.Sprintf("th-%s-%s", username, hex.EncodeToString(keyBytes))
 	hash, _ := bcrypt.GenerateFromPassword([]byte(plainToken), bcrypt.DefaultCost)
 
-	// RetryOnConflict ensures multiple pods don't overwrite each other!
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		sec, err := s.clientset.CoreV1().Secrets(s.namespace).Get(ctx, "theoros-users", metav1.GetOptions{})
 		if err != nil {
@@ -205,7 +239,9 @@ func (s *TheorosServer) ResetUser(ctx context.Context, req *connect.Request[pb.R
 	username := strings.TrimSpace(req.Msg.Username)
 	keyBytes := make([]byte, 24)
 	rand.Read(keyBytes)
-	plainToken := "th-" + hex.EncodeToString(keyBytes)
+
+	// Format token as th-<username>-<secret>
+	plainToken := fmt.Sprintf("th-%s-%s", username, hex.EncodeToString(keyBytes))
 	hash, _ := bcrypt.GenerateFromPassword([]byte(plainToken), bcrypt.DefaultCost)
 
 	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -216,7 +252,10 @@ func (s *TheorosServer) ResetUser(ctx context.Context, req *connect.Request[pb.R
 		if _, exists := sec.Data[username]; !exists {
 			return errors.New("user does not exist")
 		}
+
 		sec.Data[username] = hash
+		delete(sec.Data, username+".needs_reset")
+
 		_, err = s.clientset.CoreV1().Secrets(s.namespace).Update(ctx, sec, metav1.UpdateOptions{})
 		return err
 	})
@@ -241,7 +280,10 @@ func (s *TheorosServer) ListUsers(ctx context.Context, req *connect.Request[pb.L
 	}
 	var users []string
 	for u := range sec.Data {
-		users = append(users, u)
+		// Do not return internal flags as usernames
+		if !strings.HasSuffix(u, ".needs_reset") {
+			users = append(users, u)
+		}
 	}
 	return connect.NewResponse(&pb.ListUsersResponse{Usernames: users}), nil
 }
@@ -257,6 +299,7 @@ func (s *TheorosServer) DeleteUser(ctx context.Context, req *connect.Request[pb.
 			return errors.New("user not found")
 		}
 		delete(sec.Data, username)
+		delete(sec.Data, username+".needs_reset") // Clean up flag if it exists
 		_, err = s.clientset.CoreV1().Secrets(s.namespace).Update(ctx, sec, metav1.UpdateOptions{})
 		return err
 	})
@@ -285,10 +328,19 @@ func NewAuthInterceptor(secretKey []byte) connect.UnaryInterceptorFunc {
 				return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid or expired token"))
 			}
 
-			// Inject username into context for self-reset logic
 			if claims, ok := token.Claims.(jwt.MapClaims); ok {
 				if username, ok := claims["username"].(string); ok {
 					ctx = context.WithValue(ctx, userCtxKey, username)
+				}
+
+				// Block commands if password reset is required
+				if needsReset, ok := claims["needs_reset"].(bool); ok && needsReset {
+					if !strings.HasSuffix(req.Spec().Procedure, "ResetUser") {
+						return nil, connect.NewError(
+							connect.CodePermissionDenied,
+							errors.New("SECURITY POLICY: You are using the default setup token. You must run 'theoros user reset' to rotate your credentials before executing commands."),
+						)
+					}
 				}
 			}
 			return next(ctx, req)
@@ -303,12 +355,13 @@ func (s *TheorosServer) ExecuteCommand(ctx context.Context, req *connect.Request
 		}
 	}()
 
-	for _, flag := range req.Msg.Flags {
-		if flag == "-w" || flag == "--watch" || flag == "-f" || flag == "--follow" || flag == "-it" {
-			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("streaming flags must be executed via streaming endpoints."))
-		}
+	// Extract the authenticated username from Context
+	caller, _ := ctx.Value(userCtxKey).(string)
+	if caller == "" {
+		caller = "unknown"
 	}
 
+	// Build the argument list
 	args := []string{req.Msg.Action}
 	if req.Msg.Resource != "" {
 		args = append(args, req.Msg.Resource)
@@ -322,6 +375,9 @@ func (s *TheorosServer) ExecuteCommand(ctx context.Context, req *connect.Request
 	if len(req.Msg.Flags) > 0 {
 		args = append(args, req.Msg.Flags...)
 	}
+
+	// AUDIT LOG: Record user and full command executed
+	log.Printf("[Audit-Exec] User '%s' ran: kubectl %s", caller, strings.Join(args, " "))
 
 	var outBuf, errBuf bytes.Buffer
 	kubectlCmd := cmd.NewKubectlCommand(cmd.KubectlOptions{
@@ -366,6 +422,11 @@ func (w *serverStreamWriter) Write(p []byte) (n int, err error) {
 }
 
 func (s *TheorosServer) InteractiveExec(ctx context.Context, req *connect.Request[pb.ExecRequest], stream *connect.ServerStream[pb.ExecResponse]) error {
+	caller, _ := ctx.Value(userCtxKey).(string)
+	if caller == "" {
+		caller = "unknown"
+	}
+
 	args := []string{req.Msg.Action}
 	if req.Msg.Resource != "" {
 		args = append(args, req.Msg.Resource)
@@ -379,6 +440,9 @@ func (s *TheorosServer) InteractiveExec(ctx context.Context, req *connect.Reques
 	if len(req.Msg.Flags) > 0 {
 		args = append(args, req.Msg.Flags...)
 	}
+
+	// AUDIT LOG: Record streaming execution start
+	log.Printf("[Audit-Stream] User '%s' started stream: kubectl %s", caller, strings.Join(args, " "))
 
 	kubectlCmd := cmd.NewKubectlCommand(cmd.KubectlOptions{
 		Arguments:   args,
@@ -415,11 +479,24 @@ func (w *wsWriter) Write(p []byte) (int, error) {
 }
 
 func (s *TheorosServer) WebSocketHandler(w http.ResponseWriter, r *http.Request) {
-	tokenString := r.URL.Query().Get("token")
+	tokenString := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
+	if tokenString == "" {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) { return s.secretKey, nil })
 	if err != nil || !token.Valid {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
+	}
+
+	// Extract username from claims for auditing
+	var username string = "unknown"
+	if claims, ok := token.Claims.(jwt.MapClaims); ok {
+		if u, ok := claims["username"].(string); ok {
+			username = u
+		}
 	}
 
 	ws, err := upgrader.Upgrade(w, r, nil)
@@ -459,6 +536,9 @@ func (s *TheorosServer) WebSocketHandler(w http.ResponseWriter, r *http.Request)
 	if len(cleanFlags) > 0 {
 		args = append(args, cleanFlags...)
 	}
+
+	// AUDIT LOG: Record interactive session start (Moved here AFTER args is built)
+	log.Printf("[Audit-TTY] User '%s' opened interactive TTY session: kubectl %s", username, strings.Join(args, " "))
 
 	pr, pw := io.Pipe()
 	go func() {
@@ -515,17 +595,11 @@ func (s *TheorosServer) GetCompletions(ctx context.Context, req *connect.Request
 
 func main() {
 	log.Println("Starting Theoros Server...")
-	bootstrapPath := "/etc/theoros/bootstrap/credentials"
-	credBytes, err := os.ReadFile(bootstrapPath)
-	if err != nil {
-		log.Fatalf("Fatal: Bootstrap credentials not found: %v", err)
-	}
-	parts := strings.SplitN(strings.TrimSpace(string(credBytes)), ":", 2)
-	bootstrapUser, bootstrapPass := parts[0], parts[1]
 
 	clientset, namespace := getClientsetAndNamespace()
 	jwtSecretKey := getOrGenerateJWTSecret(clientset, namespace)
-	initUserSecret(clientset, namespace, bootstrapUser, bootstrapPass)
+
+	initUserSecret(clientset, namespace)
 
 	server := &TheorosServer{
 		secretKey: jwtSecretKey,
