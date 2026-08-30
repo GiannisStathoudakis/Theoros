@@ -5,7 +5,7 @@
 
 This project was built to address a fundamental security philosophy: **The Kubernetes API Server (port 6443) should never be exposed to humans, VPNs, or the public internet.** 
 
-Instead of distributing highly privileged `kubeconfig` files—which present a massive security and lifecycle management risk—Theoros demonstrates an alternative architecture. It drops a strict API Gateway in front of cluster operations, acting as a secure "jump box." Users authenticate via short-lived web tokens over standard HTTPS (port 443), while the native Kubernetes API remains completely hidden behind internal firewalls.
+Instead of distributing highly privileged `kubeconfig` files—which present a massive security and lifecycle management risk—Theoros demonstrates an alternative architecture. It drops a strict API Gateway in front of cluster operations, acting as a secure "jump box." Users authenticate via secure, personal access tokens (similar to GitHub Personal Access Tokens) over standard HTTPS (port 443), while the native Kubernetes API remains completely hidden behind internal firewalls.
 
 > **Architectural Disclaimer:** Theoros is an experimental implementation of the **API Gateway / Proxy Pattern** used by enterprise tools like Teleport. It is designed for **Trusted DevOps and Platform Engineering teams** to demonstrate attack surface reduction. It operates on a shared-privilege execution model to prove the concept of hiding the control plane, rather than serving as a production-ready RBAC replacement.
 
@@ -27,15 +27,15 @@ Traditional Kubernetes deployments often expose the API server to a corporate VP
 Built entirely in Go, Theoros operates on a strict split architecture between a local client and an in-cluster agent to execute the proxy pattern.
 
 ### 1. The Client (Interactive Terminal)
-* **Secure Local Vault:** Natively supports multiple clusters. Instead of plaintext Kubeconfigs, it encrypts your cluster URLs and JWT tokens locally using **AES-GCM 256** and **Argon2** key derivation.
+* **Secure Local Vault:** Natively supports multiple clusters. Instead of plaintext Kubeconfigs, it encrypts your cluster URLs and personal access tokens locally using **AES-GCM 256** and **Argon2** key derivation.
 * **Strict HTTPS:** Enforces TLS connections to prevent plaintext credential leaks or Man-in-the-Middle downgrade attacks.
 * **TAB Functionality:** The interactive prompt features robust TAB auto-completion and syntax highlighting via WebSockets, making navigating cluster resources fast and intuitive.
-* **Client-Side User Management:** Administrators can seamlessly generate, list, and manage user identities directly from the client interface.
+* **Client-Side User Management:** Administrators can seamlessly generate, list, and manage user identities and token hashes directly from the client interface.
 
 ### 2. The Server (In-Cluster Agent)
 * **API Wrapper:** Wraps the native `k8s.io/cli-runtime` source code directly inside the Go binary, safely translating client REST/WebSocket requests into internal API executions.
-* **Zero-Trust Bootstrapping:** The server auto-generates a one-time setup token upon installation, but completely locks down cluster execution until the client cryptographically rotates it to a permanent token.
-* **100% Stateless & HA Ready:** Theoros uses native Kubernetes Secrets for user identities and cryptographic signing keys. Scale to 3+ replicas for High Availability without needing persistent volumes (`PVCs`) or external databases.
+* **GitHub-Style Authentication:** User authentication relies on secure hashed tokens (comparable to GitHub Personal Access Tokens). Upon a successful login challenge, the server issues a short-lived, stateless **JWT** for session efficiency, while user credentials remain securely salted and hashed using **bcrypt** in a Kubernetes Secret database.
+* **100% Stateless & HA Ready:** Theoros uses native Kubernetes Secrets for user password hashes and cryptographic signing keys. Scale to 3+ replicas for High Availability without needing persistent volumes (`PVCs`).
 * **Application-Level Audit Logging:** Because standard Kubernetes audit logs only see the Theoros ServiceAccount, the Theoros server inherently logs the exact User, Action, and Command for every execution, stream, and interactive TTY session to the pod's standard output.
 
 ---
